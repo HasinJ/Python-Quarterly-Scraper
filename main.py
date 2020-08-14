@@ -15,16 +15,15 @@ import config
 from os import path
 from bs4 import BeautifulSoup
 
-class loginpage():
+class loginpage(config):
     def __init__(self, driver):
         self.driver = driver
         self.main_page=None
         self.__wait = WebDriverWait(self.driver,3) #private
-        self.driver.get('https://adqsr.radiantenterprise.com/bin/orf.dll/PE.platformForms.login.select.1.ghtm')
-        self.login()
 
     def login(self):
         #login text input
+        self.driver.get('https://adqsr.radiantenterprise.com/bin/orf.dll/PE.platformForms.login.select.1.ghtm')
         self.__wait.until(EC.presence_of_element_located((By.ID, "weMemberId"))).send_keys(config.radUser)
         self.__wait.until(EC.presence_of_element_located((By.ID, "pwd"))).send_keys(config.radPass)
         time.sleep(1)
