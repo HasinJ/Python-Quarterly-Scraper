@@ -11,12 +11,56 @@ import pandas as pd
 import os.path
 import csv
 import time
-import config
+from config import config
+import MySQLdb
 from os import path
 from bs4 import BeautifulSoup
 
+class sqlQueries(config):
+    def __init__(self):
+        super().__init__()
+        self.mydb = MySQLdb.connect(host = self._RDSHost,
+            user = self._RDSUser,
+            passwd = self._RDSPass,
+            db = self._RDSDb)
+
+
+    def handlePCNumbers(self, currentDriver):
+        wait = WebDriverWait(currentDriver, 3)
+        pcNumbers = []
+        frame = wait.until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
+        currentDriver.switch_to.frame(frame)
+        time.sleep(1)
+
+        soup = BeautifulSoup(currentDriver.page_source,'html.parser')
+        table = soup.find(id="grdHierarchy")
+        rows = table.findAll(True, {'class':['gridRowOdd', 'gridRowEven']})
+
+        for index in range(len(rows)):
+            dataCell = rows[index].find(class_='gridCell')
+            pcNumbers.insert(index, dataCell.text.strip())
+        if len(rows) == len(pcNumbers):
+            time.sleep(1) #it'll wait once the pcNumbers are saved into pcNumbers array
+
+        for pcNumber in pcNumbers:
+            try:
+                cursor = self.mydb.cursor()
+                sql=f'INSERT INTO storeTBL (`PCNumber`) VALUES ({pcNumber})'
+                #print(sql)
+                cursor.execute(sql)
+                self.mydb.commit()
+                cursor.close()
+
+                print(f'PC Number: {pcNumber} inserted.')
+
+            except MySQLdb._exceptions.IntegrityError:
+                print(f'PC Number: {pcNumber} exists in database.')
+                continue
+
+
 class loginpage(config):
     def __init__(self, driver):
+        super().__init__()
         self.driver = driver
         self.main_page=None
         self.__wait = WebDriverWait(self.driver,3) #private
@@ -24,8 +68,8 @@ class loginpage(config):
     def login(self):
         #login text input
         self.driver.get('https://adqsr.radiantenterprise.com/bin/orf.dll/PE.platformForms.login.select.1.ghtm')
-        self.__wait.until(EC.presence_of_element_located((By.ID, "weMemberId"))).send_keys(config.radUser)
-        self.__wait.until(EC.presence_of_element_located((By.ID, "pwd"))).send_keys(config.radPass)
+        self.__wait.until(EC.presence_of_element_located((By.ID, "weMemberId"))).send_keys(self.getRadUser())
+        self.__wait.until(EC.presence_of_element_located((By.ID, "pwd"))).send_keys(self.getRadPass())
         time.sleep(1)
 
         #continue
@@ -34,57 +78,48 @@ class loginpage(config):
         self.__wait.until(EC.presence_of_element_located((By.ID, "waContinue"))).send_keys(Keys.ENTER)
         time.sleep(1)
 
+    def clickPCNumbers(self,id):
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+        button = self.getWait().until(EC.presence_of_element_located((By.ID, f"{id}")))
+        ActionChains(self.driver).move_to_element(button).click(button).perform()
+        time.sleep(2)
+        self.main_page = switchHandle(self.driver)
+        time.sleep(1)
+
     def setWait(self,driver,time): #needs to be set everytime driver changes
         self.__wait = WebDriverWait(driver,time)
 
     def getWait(self):
         return self.__wait
 
-
 class QuarterlyHour(loginpage): #can use parent variables by just calling it
     def __init__(self,driver):
         super().__init__(driver)
-        self.clickQuarterlySales()
-        self.clickPCNumbers()
-        self.driver.quit()
 
     def clickQuarterlySales(self):
+        time.sleep(3)
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, "MenuFrame")))
         self.driver.switch_to.frame(frame)
 
         self.setWait(self.driver,20) #needs to be set everytime driver changes
-        report = self.getWait().until(EC.element_to_be_clickable((By.ID, "Node_1018702_0")))
-        ActionChains(self.driver).move_to_element(report).click(report).perform()
+        category = self.getWait().until(EC.element_to_be_clickable((By.ID, "Node_1018702_0")))
+        ActionChains(self.driver).move_to_element(category).click(category).perform()
         self.driver.switch_to.default_content()
 
-        self.setWait(self.driver,5)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, "fraContent")))
         self.driver.switch_to.frame(frame)
 
-        self.setWait(self.driver,5)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, "Frame2")))
         self.driver.switch_to.frame(frame)
-
-    def clickPCNumbers(self):
-        self.setWait(self.driver,5)
-        button = self.getWait().until(EC.presence_of_element_located((By.ID, "lookupSite_image")))
-        ActionChains(self.driver).move_to_element(button).click(button).perform()
-        time.sleep(2)
-        self.main_page = switchHandle(self.driver)
 
 
 class DDailySummary(loginpage):
     def __init__(self,driver):
         super().__init__(driver)
-        self.driver.quit()
 
-class PCNumbersIntoDatabase():
-    def __init__(self, driver):
-        hurrdurr='hurrdurr'
-
-
-
-
+#polymorphism
 def switchHandle(currentDriver): #to popup
     main_page = currentDriver.current_window_handle
     handles = currentDriver.window_handles
@@ -121,7 +156,17 @@ def backToReportOptions(currentDriver, main_page, wait, frameID='Frame2', closeI
     frame = wait.until(EC.presence_of_element_located((By.ID, f"{frameID}"))) #stays the same in report options screen
     currentDriver.switch_to.frame(frame)
 
+
+
 if __name__=="__main__":
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
-    QuarterlyHour(root)
+    queries = sqlQueries()
+
+    task1 = QuarterlyHour(root)
+    task1.login()
+    task1.clickQuarterlySales()
+    task1.clickPCNumbers('lookupSite_image')
+    queries.handlePCNumbers(task1.driver)
+
+    task1.driver.quit()
     exit()
