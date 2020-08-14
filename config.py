@@ -1,0 +1,2 @@
+radUser = ''
+radPass = ''
