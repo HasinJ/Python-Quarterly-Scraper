@@ -3,6 +3,10 @@ class config():
         self.__radUser = StringVar()
         self.__radPass = StringVar()
         self.__directory = StringVar()
+        self._RDSHost = StringVar()
+        self._RDSUser = StringVar()
+        self._RDSPass = StringVar()
+        self._RDSDb = StringVar()
 
     def getDirectory(self):
         return self.directory
