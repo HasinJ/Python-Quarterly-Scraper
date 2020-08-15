@@ -25,23 +25,7 @@ class sqlQueries(config):
             db = self._RDSDb)
 
 
-    def handlePCNumbers(self, currentDriver):
-        wait = WebDriverWait(currentDriver, 3)
-        pcNumbers = []
-        frame = wait.until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
-        currentDriver.switch_to.frame(frame)
-        time.sleep(1)
-
-        soup = BeautifulSoup(currentDriver.page_source,'html.parser')
-        table = soup.find(id="grdHierarchy")
-        rows = table.findAll(True, {'class':['gridRowOdd', 'gridRowEven']})
-
-        for index in range(len(rows)):
-            dataCell = rows[index].find(class_='gridCell')
-            pcNumbers.insert(index, dataCell.text.strip())
-        if len(rows) == len(pcNumbers):
-            time.sleep(1) #it'll wait once the pcNumbers are saved into pcNumbers array
-
+    def storeTBL(self, pcNumbers):
         for pcNumber in pcNumbers:
             try:
                 cursor = self.mydb.cursor()
@@ -58,11 +42,16 @@ class sqlQueries(config):
                 continue
 
 
-class loginpage(config):
+class Radiant(config):
     def __init__(self, driver):
         super().__init__()
         self.driver = driver
         self.main_page=None
+        self.odd=None
+        self.even=None
+        self.oddCount=int()
+        self.evenCount=int()
+        self.pcNumbers = []
         self.__wait = WebDriverWait(self.driver,3) #private
 
     def login(self):
@@ -78,7 +67,7 @@ class loginpage(config):
         self.__wait.until(EC.presence_of_element_located((By.ID, "waContinue"))).send_keys(Keys.ENTER)
         time.sleep(1)
 
-    def clickPCNumbers(self,id):
+    def clickPCOptions(self,id):
         self.setWait(self.driver,5) #needs to be set everytime driver changes
         button = self.getWait().until(EC.presence_of_element_located((By.ID, f"{id}")))
         ActionChains(self.driver).move_to_element(button).click(button).perform()
@@ -86,13 +75,34 @@ class loginpage(config):
         self.main_page = switchHandle(self.driver)
         time.sleep(1)
 
+    def clickFirstPC(self):
+        firstPC=None
+        self.odd = self.driver.find_elements_by_class_name('gridRowOdd')
+        self.even = self.driver.find_elements_by_class_name('gridRowEven')
+        elements = self.even + self.odd #for selenium to click
+        print(elements)
+        time.sleep(1)
+
+        for elementsIndex in range(len(elements)):
+            somePC = elements[elementsIndex].find_element_by_class_name('gridCell').find_element_by_tag_name('span').get_attribute("innerHTML")
+            if somePC != self.pcNumbers[0]:
+                continue
+            elif somePC == self.pcNumbers[0]:
+                firstPC = elements[elementsIndex]
+                print(somePC + ' is the first PC number AKA Business Unit')
+                self.pcNumbers.remove(somePC)
+                self.oddCount = 1
+                break
+
+        ActionChains(self.driver).move_to_element(firstPC).click(firstPC).perform()
+
     def setWait(self,driver,time): #needs to be set everytime driver changes
         self.__wait = WebDriverWait(driver,time)
 
     def getWait(self):
         return self.__wait
 
-class QuarterlyHour(loginpage): #can use parent variables by just calling it
+class QuarterlyHour(Radiant): #can use parent variables by just calling it
     def __init__(self,driver):
         super().__init__(driver)
 
@@ -100,22 +110,39 @@ class QuarterlyHour(loginpage): #can use parent variables by just calling it
         time.sleep(3)
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, "MenuFrame")))
         self.driver.switch_to.frame(frame)
-
         self.setWait(self.driver,20) #needs to be set everytime driver changes
+
         category = self.getWait().until(EC.element_to_be_clickable((By.ID, "Node_1018702_0")))
         ActionChains(self.driver).move_to_element(category).click(category).perform()
         self.driver.switch_to.default_content()
-
         self.setWait(self.driver,5) #needs to be set everytime driver changes
+
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, "fraContent")))
         self.driver.switch_to.frame(frame)
-
         self.setWait(self.driver,5) #needs to be set everytime driver changes
+
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, "Frame2")))
         self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+
+    def handlePCNumbers(self):
+        wait = WebDriverWait(self.driver, 3)
+        frame = wait.until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
+        self.driver.switch_to.frame(frame)
+        time.sleep(1)
+
+        soup = BeautifulSoup(self.driver.page_source,'html.parser')
+        table = soup.find(id="grdHierarchy")
+        rows = table.findAll(True, {'class':['gridRowOdd', 'gridRowEven']})
+
+        for index in range(len(rows)):
+            dataCell = rows[index].find(class_='gridCell')
+            self.pcNumbers.insert(index, dataCell.text.strip())
+        if len(rows) == len(self.pcNumbers):
+            time.sleep(1) #it'll wait once the pcNumbers are saved into pcNumbers array
 
 
-class DDailySummary(loginpage):
+class DDailySummary(Radiant):
     def __init__(self,driver):
         super().__init__(driver)
 
@@ -135,9 +162,11 @@ def switchHandle(currentDriver): #to popup
 
     # switch to the popup window.
     currentDriver.switch_to.window(popup_window_handle)
+    print('Switched. \n')
     return main_page
 
-def backToReportOptions(currentDriver, main_page, wait, frameID='Frame2', closeID='nothing'): #from popup
+#can move to Radiant class and method override when it comes to DDailySummary
+def backToReportOptions(currentDriver, main_page, wait, closeID='nothing'): #from popup
     print('Switching driver focus back to report options...')
 
     #click on save and close
@@ -153,7 +182,7 @@ def backToReportOptions(currentDriver, main_page, wait, frameID='Frame2', closeI
     frame = wait.until(EC.presence_of_element_located((By.ID, "fraContent"))) #stays the same in report options screen
     currentDriver.switch_to.frame(frame)
 
-    frame = wait.until(EC.presence_of_element_located((By.ID, f"{frameID}"))) #stays the same in report options screen
+    frame = wait.until(EC.presence_of_element_located((By.ID, 'Frame2'))) #stays the same in report options screen
     currentDriver.switch_to.frame(frame)
 
 
@@ -165,8 +194,10 @@ if __name__=="__main__":
     task1 = QuarterlyHour(root)
     task1.login()
     task1.clickQuarterlySales()
-    task1.clickPCNumbers('lookupSite_image')
-    queries.handlePCNumbers(task1.driver)
+    task1.clickPCOptions('lookupSite_image')
+    task1.handlePCNumbers()
+    queries.storeTBL(task1.pcNumbers)
+    task1.clickFirstPC()
 
     task1.driver.quit()
     exit()
