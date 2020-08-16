@@ -52,7 +52,6 @@ class Radiant(config):
         self.even=None
         self.oddCount=int()
         self.evenCount=int()
-        self.pcNumbers = []
         self.__wait = WebDriverWait(self.driver,3) #private
 
     def login(self):
@@ -80,6 +79,7 @@ class Radiant(config):
         firstPC=None
         self.odd = self.driver.find_elements_by_class_name('gridRowOdd')
         self.even = self.driver.find_elements_by_class_name('gridRowEven')
+        self.pcNumbers = []
         elements = self.even + self.odd #for selenium to click
         time.sleep(1)
 
