@@ -11,6 +11,7 @@ import pandas as pd
 import os.path
 import csv
 import time
+import datetime
 from config import config
 import MySQLdb
 from os import path
@@ -23,7 +24,8 @@ class sqlQueries(config):
             user = self._RDSUser,
             passwd = self._RDSPass,
             db = self._RDSDb)
-
+        self.date = '' #for inputting
+        self.dateDotNotation = None #for scraping
 
     def storeTBL(self, pcNumbers):
         for pcNumber in pcNumbers:
@@ -42,6 +44,95 @@ class sqlQueries(config):
                 continue
         print('\n')
 
+    def dateTBL(self, manual='no'):
+        hour = int(datetime.datetime.now().strftime('%H'))
+
+        if manual!='no':
+            for key, value in manual.items():
+                if isinstance(value,int)==False:
+                    sys.exit('Date argument should be in numbers not string')
+                    self.driver.quit()
+                    exit()
+            selectedDate=datetime.date(manual['year'], manual['month'], manual['day'])
+
+        elif hour >= 23: #the half of the day
+            selectedDate = get_past_date('today')
+            print("use today's date")
+
+        elif hour < 23: #the other half of the day
+            selectedDate = get_past_date('yesterday')
+            print("use yesterday's date")
+
+        if selectedDate>get_past_date('today'):
+            sys.exit('Incorrect date argument')
+            exit()
+
+        cursor = self.mydb.cursor()
+        delete = 0
+        self.date = selectedDate.strftime('%x') #local version of date 12/31/2020
+        month = selectedDate.strftime('%B') #December
+        DOW = selectedDate.strftime('%a') #Wed
+        day = selectedDate.strftime('%d') #31
+        year = selectedDate.strftime('%Y') #2020
+        dayofyear=int(selectedDate.strftime('%j')) #356
+        self.date = self.date[:6] + year #adds the year in full, "2021" instead of "21"
+        self.dateDotNotation = self.date.replace('/', '.')
+        print(self.date) #12/31/2020
+
+        #leap year
+        try:
+            leapday = datetime.date(int(year),2,29)
+            print("Leap year = yes")
+            if (selectedDate==leapday):
+                dayofyear=29.1
+            elif(selectedDate>leapday):
+                dayofyear-=1
+        except ValueError:
+            print("Leap year = no")
+
+        try:
+            sql = 'INSERT INTO DateTBL (`Date`,`DOW`,`TOD`,`Month`,`Day`,`Year`,`Day of Year`) VALUES (%s,%s,%s,%s,%s,%s,%s)'
+            values = [str(selectedDate.isoformat()),DOW,'',month,day,year,dayofyear]
+            cursor.execute(sql,values)
+            self.mydb.commit()
+        except MySQLdb._exceptions.IntegrityError:
+            print('Date already exists in DateTBL.. deleting date and truncating TempTable')
+            self.sqlFile('Temp','TempTable Truncate.txt')
+            delete=1
+
+        if delete==1:
+            self.deleteDay(selectedDate)
+            print('Done. \n ')
+
+        cursor.close()
+
+    def deleteDay(self, dateSTR):
+        cursor = self.mydb.cursor()
+        dirList = os.listdir(self.getDirectory() + fr'\Consumption Table Queries\Insert Queries')
+
+        #for every file in directory
+        for file in dirList:
+            tableName = file.split(' ')[0]
+            sql=fr'DELETE FROM {tableName} '
+            destination = self.getDirectory() + fr'\Consumption Table Queries\Insert Queries\{file}'
+            if path.exists(destination)==True:
+                with open(destination) as f:
+                    while True:
+                        line = f.readline()
+                        if not line:
+                            sql+=line.strip()
+                            break
+                        sql+=line.strip() + ' '
+
+                    sql=f"{sql} AND `Date` = '{dateSTR}'".replace('Item','ItemName')
+                    #print(sql) #checks sql
+                    cursor.execute(sql)
+                    self.mydb.commit()
+        sql=f"DELETE FROM LeftoversTBL WHERE `Date` = '{dateSTR}'"
+        cursor.execute(sql)
+        self.mydb.commit()
+        cursor.close()
+
 
 class Radiant(config):
     def __init__(self, driver):
@@ -52,6 +143,7 @@ class Radiant(config):
         self.even=None
         self.oddCount=int()
         self.evenCount=int()
+        self.pcNumbers = []
         self.__wait = WebDriverWait(self.driver,3) #private
 
     def login(self):
@@ -79,7 +171,6 @@ class Radiant(config):
         firstPC=None
         self.odd = self.driver.find_elements_by_class_name('gridRowOdd')
         self.even = self.driver.find_elements_by_class_name('gridRowEven')
-        self.pcNumbers = []
         elements = self.even + self.odd #for selenium to click
         time.sleep(1)
 
@@ -123,7 +214,6 @@ class Radiant(config):
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, 'Frame2'))) #stays the same in report options screen
         self.driver.switch_to.frame(frame)
         print('Switched. \n')
-        print(self.driver.page_source)
 
     def handlePCNumbers(self):
         wait = WebDriverWait(self.driver, 3)
@@ -171,6 +261,9 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
         self.driver.switch_to.frame(frame)
         self.setWait(self.driver,5) #needs to be set everytime driver changes
 
+    #method override (other ones should be under radiant)
+    def inputDate(self,date):
+        print('input date')
 
 class DDailySummary(Radiant):
     def __init__(self,driver):
@@ -211,14 +304,17 @@ def get_past_date(str_days_ago):
 if __name__=="__main__":
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     queries = sqlQueries()
+    queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+    task = QuarterlyHour(root)
+    task.login()
+    task.clickQuarterlySales()
+    task.clickPCOptions('lookupSite_image')
+    task.handlePCNumbers()
+    queries.storeTBL(task.pcNumbers)
+    task.clickFirstPC()
+    task.inputDate(queries.date)
 
-    task1 = QuarterlyHour(root)
-    task1.login()
-    task1.clickQuarterlySales()
-    task1.clickPCOptions('lookupSite_image')
-    task1.handlePCNumbers()
-    queries.storeTBL(task1.pcNumbers)
-    task1.clickFirstPC()
+    print(f'{queries.date}\n{queries.dateDotNotation}')
 
-    task1.driver.quit()
+    task.driver.quit()
     exit()
