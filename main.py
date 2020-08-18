@@ -13,17 +13,13 @@ import csv
 import time
 import datetime
 from config import config
-import MySQLdb
+from scrape import scrapeQuarterlyHour
 from os import path
 from bs4 import BeautifulSoup
 
 class sqlQueries(config):
     def __init__(self):
         super().__init__()
-        self.mydb = MySQLdb.connect(host = self._RDSHost,
-            user = self._RDSUser,
-            passwd = self._RDSPass,
-            db = self._RDSDb)
         self.date = '' #for inputting
         self.dateDotNotation = None #for scraping
 
