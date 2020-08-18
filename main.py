@@ -106,6 +106,25 @@ class sqlQueries(config):
 
         cursor.close()
 
+    def sqlFile(self, folder, file):
+        cursor = self.mydb.cursor()
+
+        destination = self.getDirectory() + fr'\Consumption Table Queries\{folder}\{file}'
+
+        with open(destination) as f:
+            sql=''
+            while True:
+                line = f.readline()
+                if not line:
+                    sql+=line.strip()
+                    break
+                sql+=line.strip() + ' '
+            #print(sql) #checks sql
+            cursor.execute(sql)
+
+        self.mydb.commit()
+        cursor.close()
+
     def deleteDay(self, dateSTR):
         cursor = self.mydb.cursor()
         dirList = os.listdir(self.getDirectory() + fr'\Consumption Table Queries\Insert Queries')
