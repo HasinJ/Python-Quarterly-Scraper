@@ -101,7 +101,7 @@ class sqlQueries(config):
             delete=1
 
         if delete==1:
-            self.deleteDay(selectedDate)
+            self.deleteDayForItems(selectedDate)
             print('Done. \n ')
 
         cursor.close()
@@ -125,7 +125,7 @@ class sqlQueries(config):
         self.mydb.commit()
         cursor.close()
 
-    def deleteDay(self, dateSTR):
+    def deleteDayForItems(self, dateSTR):
         cursor = self.mydb.cursor()
         dirList = os.listdir(self.getDirectory() + fr'\Consumption Table Queries\Insert Queries')
 
@@ -282,7 +282,14 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
 
     #method override (other ones should be under radiant)
     def inputDate(self,date):
-        print('input date')
+        dateBox = self.getWait().until(EC.element_to_be_clickable((By.ID, "calStartDate")))
+        dateBox.clear()
+        dateBox.send_keys(date)
+
+    def clickRun(self,id):
+        run = self.getWait().until(EC.element_to_be_clickable((By.ID, f"{id}")))
+        ActionChains(self.driver).move_to_element(run).click(run).perform()
+
 
 class DDailySummary(Radiant):
     def __init__(self,driver):
@@ -332,6 +339,7 @@ if __name__=="__main__":
     queries.storeTBL(task.pcNumbers)
     task.clickFirstPC()
     task.inputDate(queries.date)
+    task.clickRun('wrqtr_hour_sales_activity__AutoRunReport')
 
     print(f'{queries.date}\n{queries.dateDotNotation}')
 
