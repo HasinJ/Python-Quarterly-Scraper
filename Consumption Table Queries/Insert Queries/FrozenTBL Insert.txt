@@ -1,0 +1,2 @@
+Where (Item like "%Frozen%" OR
+Item like "%coolatta%")

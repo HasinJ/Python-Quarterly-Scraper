@@ -1,0 +1,15 @@
+Where (Item like "Add Espresso%" OR
+Item like "Americano%" OR
+Item like "Cappuccino%" OR
+Item like "D-Espresso%" OR
+Item like "Latte%" OR
+Item like "Macchiato%" OR
+Item like "Matcha Latte%" OR
+Item like "Pink Velvet%" OR
+Item like "Signature Latte%" OR
+Item like "Box of Joe%" OR
+Item like "%Hot Coffee%" OR
+Item like "Dunkaccino%" OR
+Item like "Hot Chocolate%" OR
+Item like "Hot Tea%" OR
+Item like "Vanilla Chai%")

@@ -1,0 +1,13 @@
+Where (Item like "%cold brew%" OR
+Item like "%iced coffee%" OR
+Item like "%iced americano%" OR
+Item like "%iced Cappuccino%" OR
+Item like "%iced chai%" OR
+Item like "%iced latte%" OR
+Item like "%Iced Macchiato%" OR
+Item like "%Iced Matcha%" OR
+Item like "%Iced Pink%" OR
+Item like "%Iced Tea%" OR
+Item like "%Iced Signature%" OR
+Item like "%Cup of Water%" OR
+Item like "%Refreshers%")
