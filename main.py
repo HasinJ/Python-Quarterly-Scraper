@@ -286,6 +286,9 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
         run = self.getWait().until(EC.element_to_be_clickable((By.ID, f"{id}")))
         ActionChains(self.driver).move_to_element(run).click(run).perform()
 
+    def scrape(self):
+        pass
+
 
 class DDailySummary(Radiant):
     def __init__(self,driver):
@@ -336,6 +339,8 @@ if __name__=="__main__":
     task.clickFirstPC()
     task.inputDate(queries.date)
     task.clickRun('wrqtr_hour_sales_activity__AutoRunReport')
+    task = scrapeQuarterlyHour(task.driver.page_source, queries.dateDotNotation)
+    task.scrape()
 
     print(f'{queries.date}\n{queries.dateDotNotation}')
 
