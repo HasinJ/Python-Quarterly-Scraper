@@ -2,6 +2,7 @@ class scrapeQuarterlyHour():
     def __init__(self):
         #self._html = driver.page_source'
         self._html = open(fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour' + fr'\report.html','rb') # 'rb' stands for read-binary, write-binary needs chmoding, this also needs to be changed for Selenium (needs to have date)
+        self.data=[]
         #self._date = date
         print('the commented line above this needs to be figured out')
 
@@ -25,19 +26,28 @@ class scrapeQuarterlyHour():
         rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
         start='no'
         for row in rows:
+            cell=dict()
             for i in range(len(columnNames)):
                 field=row.select('.CellStyle')[i]
                 if field['id']=='0':
-                    if start=='no' and field.text.strip()!='05:00 AM':
-                        print(field.text.strip() + ' skipped')
+                    text=field.text.strip()
+                    if start=='no' and text!='04:00 AM':
+                        print(text + ' skipped')
                         break
-                    continue #placeholder
+                    elif text=='10:15 PM':
+                        print(self.data)
+                        return
+                    cell[columnNames[0]]=text
+                    continue
                 start='yes'
-                print(field)
+                cell[columnNames[i]]=field['dval']
                 #print(row)
                 #print(row.select('.CellStyle')[0])
                 #print(row.findAll(True, {'class':['CellStyle']})[1].attrs['dval'])
+            if start =='yes':
+                self.data.append(cell)
         #print(rows[0].select('.CellStyle')[1].attrs['dval'])
+
 
 class scrapeDDailySummary():
     def __init__(self):
