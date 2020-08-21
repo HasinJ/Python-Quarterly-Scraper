@@ -3,7 +3,8 @@ class scrapeQuarterlyHour():
         #self._html = driver.page_source'
         self._html = open(fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour' + fr'\report.html','rb') # 'rb' stands for read-binary, write-binary needs chmoding, this also needs to be changed for Selenium (needs to have date)
         self.data=[]
-        self.dateDotNotation='8.19.2020'
+        self.columns=[]
+        self.__date='8.19.2020'
         print('the commented line above this needs to be figured out')
 
     #this is the part that needs to be copied
@@ -17,11 +18,11 @@ class scrapeQuarterlyHour():
 
         table = soup.find_all(class_='TableStyle')
         #column names
-        columnNames=table[0]
-        columnNames=columnNames.select('.CellStyle')
+        self.columns=table[0]
+        self.columns=self.columns.select('.CellStyle')
         i=0
-        for column in columnNames:
-            columnNames[i]=column.text.strip()
+        for column in self.columns:
+            self.columns[i]=column.text.strip()
             i+=1
         #rows
         table=table[1]
@@ -29,20 +30,23 @@ class scrapeQuarterlyHour():
         start='no'
         for row in rows:
             cell=dict()
-            for i in range(len(columnNames)):
+            cell['PCNumber']=pcNumber
+            cell['Date']=self.__date
+            for i in range(len(self.columns)):
                 field=row.select('.CellStyle')[i]
                 if field['id']=='0':
                     text=field.text.strip()
                     if start=='no' and text!='04:00 AM':
-                        #print(text + ' skipped')
+                        print(f'{text} skipped')
                         break
                     elif text=='10:15 PM':
+                        self.__date=self.__date.replace('/','.')
                         self.dump(pcNumber)
                         return
-                    cell[columnNames[0]]=text
+                    cell[self.columns[0]]=text
                     continue
                 start='yes'
-                cell[columnNames[i]]=field['dval']
+                cell[self.columns[i]]=field['dval']
             if start =='yes':
                 self.data.append(cell)
 
@@ -61,7 +65,7 @@ class scrapeQuarterlyHour():
             os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
 
         #checks for .json existence
-        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour\Reports\Quarterly Hours\{pcNumber}\{self.dateDotNotation}'
+        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
         if path.exists(directory + 'Output.json')==False:
             with open(directory + 'Output.json','w') as f:
                 json.dump(self.data,f)
