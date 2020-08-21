@@ -13,7 +13,6 @@ import csv
 import time
 import datetime
 from config import config
-from scrape import scrapeQuarterlyHour
 from os import path
 from bs4 import BeautifulSoup
 
@@ -35,7 +34,7 @@ class sqlQueries(config):
 
                 print(f'PC Number: {pcNumber} inserted.')
 
-            except MySQLdb._exceptions.IntegrityError:
+            except self.MySQLdb._exceptions.IntegrityError:
                 print(f'PC Number: {pcNumber} exists in database.')
                 continue
         print('\n')
@@ -91,13 +90,13 @@ class sqlQueries(config):
             values = [str(selectedDate.isoformat()),DOW,'',month,day,year,dayofyear]
             cursor.execute(sql,values)
             self.mydb.commit()
-        except MySQLdb._exceptions.IntegrityError:
+        except self.MySQLdb._exceptions.IntegrityError:
             print('Date already exists in DateTBL.. deleting date and truncating TempTable')
-            self.sqlFile('Temp','TempTable Truncate.txt')
+            #self.sqlFile('Temp','TempTable Truncate.txt')
             delete=1
 
         if delete==1:
-            self.deleteDayForItems(selectedDate)
+            #self.deleteDayForItems(selectedDate)
             print('Done. \n ')
 
         cursor.close()
@@ -148,6 +147,11 @@ class sqlQueries(config):
         self.mydb.commit()
         cursor.close()
 
+    def quarterlyHourTBL(self,columns):
+        insert='INSERT INTO QuarterlyHourTBL ('
+        values='VALUES ('
+        for i in range(len(columns)):
+            pass
 
 class Radiant(config):
     def __init__(self, driver):
@@ -158,7 +162,7 @@ class Radiant(config):
         self.even=None
         self.oddCount=int()
         self.evenCount=int()
-        self.pcNumbers = []
+        self.__pcNumbers = []
         self.__wait = WebDriverWait(self.driver,3) #private
 
     def login(self):
@@ -191,12 +195,12 @@ class Radiant(config):
 
         for elementsIndex in range(len(elements)):
             somePC = elements[elementsIndex].find_element_by_class_name('gridCell').find_element_by_tag_name('span').get_attribute("innerHTML")
-            if somePC != self.pcNumbers[0]:
+            if somePC != self.__pcNumbers[0]:
                 continue
-            elif somePC == self.pcNumbers[0]:
+            elif somePC == self.__pcNumbers[0]:
                 firstPC = elements[elementsIndex]
                 print(f'\n{somePC} is the first PC number AKA Business Unit')
-                self.pcNumbers.remove(somePC)
+                #self.__pcNumbers.remove(somePC)
                 self.oddCount = 1
                 break
 
@@ -242,9 +246,10 @@ class Radiant(config):
 
         for index in range(len(rows)):
             dataCell = rows[index].find(class_='gridCell')
-            self.pcNumbers.insert(index, dataCell.text.strip())
-        if len(rows) == len(self.pcNumbers):
+            self.__pcNumbers.insert(index, dataCell.text.strip())
+        if len(rows) == len(self.__pcNumbers):
             time.sleep(1) #it'll wait once the pcNumbers are saved into pcNumbers array
+            return self.__pcNumbers
 
     def setWait(self,driver,time): #needs to be set everytime driver changes
         self.__wait = WebDriverWait(driver,time)
@@ -282,17 +287,105 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
         dateBox.clear()
         dateBox.send_keys(date)
 
-    def clickRun(self,id):
+    def click(self,id):
         run = self.getWait().until(EC.element_to_be_clickable((By.ID, f"{id}")))
         ActionChains(self.driver).move_to_element(run).click(run).perform()
-
-    def scrape(self):
-        pass
+        time.sleep(2)
 
 
 class DDailySummary(Radiant):
     def __init__(self,driver):
         super().__init__(driver)
+
+class scrapeQuarterlyHour(QuarterlyHour):
+    def __init__(self,driver,date, odd, even, oddCount, evenCount):
+        super().__init__(driver)
+        self._html = driver.page_source
+        self.__date = date
+        self.odd=odd
+        self.even=even
+        self.oddCount=oddCount
+        self.evenCount=evenCount
+        self.data=[]
+        self.columns=[]
+
+    def scrape(self):
+        from bs4 import BeautifulSoup
+        self.data=[]
+        soup = BeautifulSoup(self._html,'html.parser')
+
+        #pc number
+        table = soup.find(id="ReportHeader").find('div',attrs={'align':'left'})
+        pcNumber=table.text.strip().split(" ")[2]
+
+        table = soup.find_all(class_='TableStyle')
+        #column names
+        self.columns=table[0]
+        self.columns=self.columns.select('.CellStyle')
+        i=0
+        for column in self.columns:
+            self.columns[i]=column.text.strip()
+            i+=1
+        #rows
+        table=table[1]
+        rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
+        start='no'
+        for row in rows:
+            cell=dict()
+            cell['PCNumber']=pcNumber
+            cell['Date']=self.__date
+            for i in range(len(self.columns)):
+                field=row.select('.CellStyle')[i]
+                if field['id']=='0':
+                    text=field.text.strip()
+                    if start=='no' and text!='04:00 AM':
+                        print(f'{text} skipped')
+                        break
+                    elif text=='10:15 PM':
+                        self.__date=self.__date.replace('/','.')
+                        self.dump(pcNumber)
+                        return
+                    cell[self.columns[0]]=text
+                    continue
+                start='yes'
+                cell[self.columns[i]]=field['dval']
+            if start =='yes':
+                self.data.append(cell)
+
+    def dump(self,pcNumber):
+        import json
+        import pandas as pd
+        import os
+        from os import path
+
+        #checks for folder existence
+        directory=self.getDirectory()
+        if path.isdir(directory + fr'\Reports\Quarterly Hours')==False:
+            if path.isdir(directory + fr'\Reports')==False:
+                os.mkdir(directory + fr'\Reports')
+            os.mkdir(directory + fr'\Reports\Quarterly Hours')
+            os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
+
+        #checks for .json existence
+        directory=fr'{directory}\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
+        if path.exists(directory + 'Output.json')==False:
+            with open(directory + 'Output.json','w') as f:
+                json.dump(self.data,f)
+            df = pd.read_json(open(directory + 'Output.json','r'))
+            df.to_csv(directory + 'dataframe.csv', index=False, header=True)
+
+
+
+
+class scrapeDDailySummary(DDailySummary):
+    def __init__(self,driver,date, odd, even, oddCount, evenCount):
+        super().__init__(driver)
+        self._html = driver.page_source
+        self.__date = date
+        self.data=[]
+
+    def scrape(self):
+        pass
 
 
 #polymorphism
@@ -334,13 +427,20 @@ if __name__=="__main__":
     task.login()
     task.clickQuarterlySales()
     task.clickPCOptions('lookupSite_image')
-    task.handlePCNumbers()
-    queries.storeTBL(task.pcNumbers)
+    pcNumbers = task.handlePCNumbers()
+    queries.storeTBL(pcNumbers)
     task.clickFirstPC()
     task.inputDate(queries.date)
-    task.clickRun('wrqtr_hour_sales_activity__AutoRunReport')
-    task = scrapeQuarterlyHour(task.driver.page_source, queries.dateDotNotation)
+    task.click('wrqtr_hour_sales_activity__AutoRunReport')
+    task = scrapeQuarterlyHour(task.driver, queries.date, task.odd, task.even, task.oddCount, task.evenCount)
     task.scrape()
+    queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
+    task.click('wrqtr_hour_sales_activity__Options')
+    for pcNumber in pcNumbers:
+        print(pcNumber)
+    #pc
+    #scrape
+    #options
 
     print(f'{queries.date}\n{queries.dateDotNotation}')
 
