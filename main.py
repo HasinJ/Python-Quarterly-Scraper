@@ -147,11 +147,24 @@ class sqlQueries(config):
         self.mydb.commit()
         cursor.close()
 
-    def quarterlyHourTBL(self,columns):
-        insert='INSERT INTO QuarterlyHourTBL ('
-        values='VALUES ('
+    def quarterlyHourTBL(self,pcNumber,columns):
+        import csv
+        cursor = self.mydb.cursor()
+
+        insert=f''
+        values=f''
         for i in range(len(columns)):
-            pass
+            insert+=f'`{columns[i]}`,'
+            values+=f'%s,'
+        insert=insert.replace('%','Percent')
+        sql=f'INSERT INTO QuarterlyHourTBL ({insert[:-1]}) VALUES ({values[:-1]})'
+
+        csv_data = csv.reader(open(self.getDirectory() + fr'\Reports\Quarterly Hours\{pcNumber}\{self.dateDotNotation}dataframe.csv'))
+        next(csv_data) #to ignore header
+        for row in csv_data:
+           cursor.execute(sql, row)
+        self.mydb.commit()
+        cursor.close()
 
 class Radiant(config):
     def __init__(self, driver):
@@ -311,7 +324,6 @@ class scrapeQuarterlyHour(QuarterlyHour):
 
     def scrape(self):
         from bs4 import BeautifulSoup
-        self.data=[]
         soup = BeautifulSoup(self._html,'html.parser')
 
         #pc number
@@ -324,7 +336,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
         self.columns=self.columns.select('.CellStyle')
         i=0
         for column in self.columns:
-            self.columns[i]=column.text.strip()
+            self.columns[i]=column.text.strip().replace(' ','')
             i+=1
         #rows
         table=table[1]
@@ -343,6 +355,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
                         break
                     elif text=='10:15 PM':
                         self.__date=self.__date.replace('/','.')
+                        self.columns=['PCNumber','Date']+self.columns
                         self.dump(pcNumber)
                         return
                     cell[self.columns[0]]=text
@@ -359,7 +372,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
         from os import path
 
         #checks for folder existence
-        directory=self.getDirectory()
+        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour'
         if path.isdir(directory + fr'\Reports\Quarterly Hours')==False:
             if path.isdir(directory + fr'\Reports')==False:
                 os.mkdir(directory + fr'\Reports')
@@ -367,7 +380,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
             os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
 
         #checks for .json existence
-        directory=fr'{directory}\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
+        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
         if path.exists(directory + 'Output.json')==False:
             with open(directory + 'Output.json','w') as f:
                 json.dump(self.data,f)
@@ -438,9 +451,9 @@ if __name__=="__main__":
     task.click('wrqtr_hour_sales_activity__Options')
     for pcNumber in pcNumbers:
         print(pcNumber)
-    #pc
-    #scrape
-    #options
+        #pc
+        #scrape
+        #options
 
     print(f'{queries.date}\n{queries.dateDotNotation}')
 

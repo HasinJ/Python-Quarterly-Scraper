@@ -22,7 +22,7 @@ class scrapeQuarterlyHour():
         self.columns=self.columns.select('.CellStyle')
         i=0
         for column in self.columns:
-            self.columns[i]=column.text.strip()
+            self.columns[i]=column.text.strip().replace(' ','')
             i+=1
         #rows
         table=table[1]
@@ -41,6 +41,7 @@ class scrapeQuarterlyHour():
                         break
                     elif text=='10:15 PM':
                         self.__date=self.__date.replace('/','.')
+                        self.columns=['PCNumber','Date']+self.columns
                         self.dump(pcNumber)
                         return
                     cell[self.columns[0]]=text
@@ -86,3 +87,14 @@ class scrapeDDailySummary():
 
 test = scrapeQuarterlyHour()
 test.scrape()
+print(test.columns)
+
+insert=f''
+values=f''
+for i in range(len(test.columns)):
+    insert+=f'`{test.columns[i]}`,'
+    values+=f'%s,'
+insert=insert.replace('%','Percent')
+sql=f'INSERT INTO QuarterlyHourTBL ({insert[:-1]}) VALUES ({values[:-1]})'
+print(sql)
+['TimePeriodBegins', 'NetSales', 'TransCount', 'EstimatedLaborCost', 'LaborHours', 'LaborCost%NetSales', 'NetSales/LaborHour', 'Trans/LaborHour']
