@@ -417,9 +417,15 @@ def get_past_date(str_days_ago):
     else:
         return "Wrong Argument format"
 
+def startingTimer():
+    print('Starting program in...')
+    for i in range(5):
+        print(i+1)
+        time.sleep(1)
 
 if __name__=="__main__":
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
+    startingTimer()
     queries = sqlQueries()
     try:
         queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
