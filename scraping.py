@@ -11,6 +11,7 @@ class scrapeQuarterlyHour():
     def scrape(self):
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(self._html,'html.parser')
+        self.data=[]
 
         #pc number
         table = soup.find(id="ReportHeader").find('div',attrs={'align':'left'})

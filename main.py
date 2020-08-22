@@ -6,15 +6,17 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 
-import json
-import pandas as pd
-import os.path
 import csv
 import time
 import datetime
-from config import config
+import json
+import pandas as pd
+import math
+import os
 from os import path
+from config import config
 from bs4 import BeautifulSoup
+
 
 class sqlQueries(config):
     def __init__(self):
@@ -171,10 +173,8 @@ class Radiant(config):
         super().__init__()
         self.driver = driver
         self.main_page=None
-        self.odd=None
-        self.even=None
-        self.oddCount=int()
-        self.evenCount=int()
+        self.oddCount=0
+        self.evenCount=0
         self.__pcNumbers = []
         self.__wait = WebDriverWait(self.driver,3) #private
 
@@ -197,28 +197,28 @@ class Radiant(config):
         ActionChains(self.driver).move_to_element(button).click(button).perform()
         time.sleep(2)
         self.main_page = switchHandle(self.driver)
+        self.setWait(self.driver,5)
+        time.sleep(1)
+        frame = self.getWait().until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
+        self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,5)
         time.sleep(1)
 
-    def clickFirstPC(self):
-        firstPC=None
-        self.odd = self.driver.find_elements_by_class_name('gridRowOdd')
-        self.even = self.driver.find_elements_by_class_name('gridRowEven')
-        elements = self.even + self.odd #for selenium to click
+    def clickPC(self,index=1):
         time.sleep(1)
+        even = self.driver.find_elements_by_class_name('gridRowEven')
+        odd = self.driver.find_elements_by_class_name('gridRowOdd')
 
-        for elementsIndex in range(len(elements)):
-            somePC = elements[elementsIndex].find_element_by_class_name('gridCell').find_element_by_tag_name('span').get_attribute("innerHTML")
-            if somePC != self.__pcNumbers[0]:
-                continue
-            elif somePC == self.__pcNumbers[0]:
-                firstPC = elements[elementsIndex]
-                print(f'\n{somePC} is the first PC number AKA Business Unit')
-                #self.__pcNumbers.remove(somePC)
-                self.oddCount = 1
-                break
+        if index/2 == math.floor(index/2):
+            print('even...')
+            ActionChains(self.driver).move_to_element(even[self.evenCount]).click(even[self.evenCount]).perform()
+            self.evenCount += 1
 
-        ActionChains(self.driver).move_to_element(firstPC).click(firstPC).perform()
-        time.sleep(1)
+        elif index/2 != math.floor(index/2):
+            print('odd...')
+            ActionChains(self.driver).move_to_element(odd[self.oddCount]).click(odd[self.oddCount]).perform()
+            self.oddCount += 1
+
         self.backToReportOptions()
 
     def backToReportOptions(self, **kwargs): #from popup
@@ -248,11 +248,6 @@ class Radiant(config):
         print('Switched. \n')
 
     def handlePCNumbers(self):
-        wait = WebDriverWait(self.driver, 3)
-        frame = wait.until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
-        self.driver.switch_to.frame(frame)
-        time.sleep(1)
-
         soup = BeautifulSoup(self.driver.page_source,'html.parser')
         table = soup.find(id="grdHierarchy")
         rows = table.findAll(True, {'class':['gridRowOdd', 'gridRowEven']})
@@ -296,6 +291,7 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
 
     #method override (other ones should be under radiant)
     def inputDate(self,date):
+        time.sleep(2)
         dateBox = self.getWait().until(EC.element_to_be_clickable((By.ID, "calStartDate")))
         dateBox.clear()
         dateBox.send_keys(date)
@@ -311,20 +307,17 @@ class DDailySummary(Radiant):
         super().__init__(driver)
 
 class scrapeQuarterlyHour(QuarterlyHour):
-    def __init__(self,driver,date, odd, even, oddCount, evenCount):
+    def __init__(self,driver,date,oddCount,evenCount):
         super().__init__(driver)
-        self._html = driver.page_source
         self.__date = date
-        self.odd=odd
-        self.even=even
         self.oddCount=oddCount
         self.evenCount=evenCount
         self.data=[]
         self.columns=[]
 
-    def scrape(self):
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(self._html,'html.parser')
+    def scrape(self,html):
+        soup = BeautifulSoup(html,'html.parser')
+        self.data=[]
 
         #pc number
         table = soup.find(id="ReportHeader").find('div',attrs={'align':'left'})
@@ -366,17 +359,14 @@ class scrapeQuarterlyHour(QuarterlyHour):
                 self.data.append(cell)
 
     def dump(self,pcNumber):
-        import json
-        import pandas as pd
-        import os
-        from os import path
-
         #checks for folder existence
         directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour'
         if path.isdir(directory + fr'\Reports\Quarterly Hours')==False:
             if path.isdir(directory + fr'\Reports')==False:
                 os.mkdir(directory + fr'\Reports')
             os.mkdir(directory + fr'\Reports\Quarterly Hours')
+            os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
+        elif path.isdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')==False:
             os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
 
         #checks for .json existence
@@ -386,8 +376,6 @@ class scrapeQuarterlyHour(QuarterlyHour):
                 json.dump(self.data,f)
             df = pd.read_json(open(directory + 'Output.json','r'))
             df.to_csv(directory + 'dataframe.csv', index=False, header=True)
-
-
 
 
 class scrapeDDailySummary(DDailySummary):
@@ -406,7 +394,7 @@ def switchHandle(currentDriver): #to popup
     main_page = currentDriver.current_window_handle
     handles = currentDriver.window_handles
 
-    print(f'{len(handles)} handles located... switching windows...')
+    print(f'\n{len(handles)} handles located... switching windows...')
     popup_window_handle = None
 
     # loop through the window handles and find the popup window.
@@ -442,20 +430,20 @@ if __name__=="__main__":
     task.clickPCOptions('lookupSite_image')
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
-    task.clickFirstPC()
+    task.clickPC()
+    print(f'{pcNumbers[0]} is the first PC')
     task.inputDate(queries.date)
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
-    task = scrapeQuarterlyHour(task.driver, queries.date, task.odd, task.even, task.oddCount, task.evenCount)
-    task.scrape()
+    task = scrapeQuarterlyHour(task.driver, queries.date,task.oddCount, task.evenCount)
+    task.scrape(task.driver.page_source)
     queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
-    task.click('wrqtr_hour_sales_activity__Options')
     for pcNumber in pcNumbers:
-        print(pcNumber)
-        #pc
-        #scrape
-        #options
-
-    print(f'{queries.date}\n{queries.dateDotNotation}')
+        task.click('wrqtr_hour_sales_activity__Options') #goes back to report options
+        task.clickPCOptions('lookupSite_image')
+        task.clickPC(pcNumbers.index(pcNumber))
+        task.click('wrqtr_hour_sales_activity__AutoRunReport')
+        task.scrape(task.driver.page_source)
+        queries.quarterlyHourTBL(pcNumber,task.columns)
 
     task.driver.quit()
     exit()
