@@ -48,8 +48,8 @@ class sqlQueries(config):
         if manual!='no':
             for key, value in manual.items():
                 if isinstance(value,int)==False:
-                    sys.exit('Date argument should be in numbers not string')
                     self.driver.quit()
+                    sys.exit('Date argument should be in numbers not string')
                     exit()
             self.selectedDate=datetime.date(manual['year'], manual['month'], manual['day'])
 
@@ -189,6 +189,25 @@ class Radiant(config):
         self.__wait.until(EC.presence_of_element_located((By.ID, "waContinue"))).send_keys(Keys.ENTER)
         time.sleep(1)
 
+    def clickTaskOption(self,id):
+        time.sleep(3)
+        frame = self.getWait().until(EC.presence_of_element_located((By.ID, "MenuFrame")))
+        self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,20) #needs to be set everytime driver changes
+
+        category = self.getWait().until(EC.element_to_be_clickable((By.ID, id)))
+        ActionChains(self.driver).move_to_element(category).click(category).perform()
+        self.driver.switch_to.default_content()
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+
+        frame = self.getWait().until(EC.presence_of_element_located((By.ID, "fraContent")))
+        self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+
+        frame = self.getWait().until(EC.presence_of_element_located((By.ID, "Frame2")))
+        self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+
     def clickPCOptions(self,id):
         self.setWait(self.driver,5) #needs to be set everytime driver changes
         button = self.getWait().until(EC.presence_of_element_located((By.ID, f"{id}")))
@@ -218,6 +237,11 @@ class Radiant(config):
             self.oddCount += 1
 
         self.backToReportOptions()
+
+    def click(self,id):
+        run = self.getWait().until(EC.element_to_be_clickable((By.ID, f"{id}")))
+        ActionChains(self.driver).move_to_element(run).click(run).perform()
+        time.sleep(2)
 
     def backToReportOptions(self, **kwargs): #from popup
         print('Switching driver focus back to report options...')
@@ -268,25 +292,6 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
     def __init__(self,driver):
         super().__init__(driver)
 
-    def clickQuarterlySales(self):
-        time.sleep(3)
-        frame = self.getWait().until(EC.presence_of_element_located((By.ID, "MenuFrame")))
-        self.driver.switch_to.frame(frame)
-        self.setWait(self.driver,20) #needs to be set everytime driver changes
-
-        category = self.getWait().until(EC.element_to_be_clickable((By.ID, "Node_1018702_0")))
-        ActionChains(self.driver).move_to_element(category).click(category).perform()
-        self.driver.switch_to.default_content()
-        self.setWait(self.driver,5) #needs to be set everytime driver changes
-
-        frame = self.getWait().until(EC.presence_of_element_located((By.ID, "fraContent")))
-        self.driver.switch_to.frame(frame)
-        self.setWait(self.driver,5) #needs to be set everytime driver changes
-
-        frame = self.getWait().until(EC.presence_of_element_located((By.ID, "Frame2")))
-        self.driver.switch_to.frame(frame)
-        self.setWait(self.driver,5) #needs to be set everytime driver changes
-
     #method override (other ones should be under radiant)
     def inputDate(self,date):
         time.sleep(2)
@@ -294,11 +299,20 @@ class QuarterlyHour(Radiant): #can use parent variables by just calling it
         dateBox.clear()
         dateBox.send_keys(date)
 
-    def click(self,id):
-        run = self.getWait().until(EC.element_to_be_clickable((By.ID, f"{id}")))
-        ActionChains(self.driver).move_to_element(run).click(run).perform()
-        time.sleep(2)
 
+class ConsumptionTables(Radiant):
+    def __init__(self, driver):
+        super().__init__(driver)
+
+    def selectOrgType(self):
+        dropdown = self.getWait().until(EC.element_to_be_clickable((By.ID, f"__selOrgUnit")))
+        ActionChains(self.driver).move_to_element(dropdown).click(dropdown).perform()
+        time.sleep(2)
+        for i in range(3):
+            dropdown.send_keys(Keys.DOWN)
+            time.sleep(1)
+        dropdown.send_keys(Keys.ENTER)
+        time.sleep(1)
 
 class DDailySummary(Radiant):
     def __init__(self,driver):
@@ -424,6 +438,7 @@ def startingTimer():
         time.sleep(1)
 
 if __name__=="__main__":
+    """
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     queries = sqlQueries()
@@ -432,9 +447,10 @@ if __name__=="__main__":
     except queries.MySQLdb._exceptions.IntegrityError:
         print('Date exists, deleting quarters associated with it...')
         queries.deleteDayForQuarter()
+        print('Done \n')
     task = QuarterlyHour(root)
     task.login()
-    task.clickQuarterlySales()
+    task.clickTaskOption("Node_1018702_0")
     task.clickPCOptions('lookupSite_image')
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
@@ -452,6 +468,28 @@ if __name__=="__main__":
         task.click('wrqtr_hour_sales_activity__AutoRunReport')
         task.scrape(task.driver.page_source)
         queries.quarterlyHourTBL(pcNumber,task.columns)
-
     task.driver.quit()
+    """
+
+    root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
+    startingTimer()
+    queries = sqlQueries()
+    try:
+        queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+    except queries.MySQLdb._exceptions.IntegrityError:
+        print('Date exists, deleting quarters associated with it... (not really)')
+        #queries.deleteDayForQuarter()
+        print('Done \n')
+    task=ConsumptionTables(root)
+    task.login()
+    task.clickTaskOption("Node_1018704_0")
+    task.selectOrgType()
+    task.clickPCOptions('__lufBusUnit_image')
+    pcNumbers = task.handlePCNumbers()
+    queries.storeTBL(pcNumbers)
+    print(f'{pcNumbers[0]} is the first PC')
+    task.clickPC()
+    time.sleep(5)
+    task.driver.quit()
+
     exit()
