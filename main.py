@@ -243,21 +243,22 @@ class Radiant(config):
         ActionChains(self.driver).move_to_element(run).click(run).perform()
         time.sleep(2)
 
-    def backToReportOptions(self, **kwargs): #from popup
-        print('Switching driver focus back to report options...')
+    def inputDate(self,date):
+        self.click('lkupDates_image')
+        self.main_page=switchHandle(self.driver)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+        frame = self.getWait().until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
+        self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,5) #needs to be set everytime driver changes
+        dateBox = self.getWait().until(EC.presence_of_element_located((By.ID, 'calStartDay')))
+        dateBox.send_keys(date)
+        dateBox = self.getWait().until(EC.presence_of_element_located((By.ID, 'calEndDay')))
+        dateBox.send_keys(date)
+        self.click('waSaveClose')
+        time.sleep(1)
+        self.backToReportOptions()
 
-        #click on save and close
-        for key, value in kwargs.items():
-            if key == 'closeID':
-                setWait(self.driver, 5)
-                saveANDclose = self.getWait().until(EC.presence_of_element_located((By.ID, closeID)))
-                saveANDclose.send_keys(Keys.ENTER)
-                break
-            elif len(kwargs) > 1:
-                print('too many arguments for backToReportOptions()')
-                self.driver.quit()
-                exit()
-
+    def backToReportOptions(self): #from popup
         #go back to previous screen/frame
         self.driver.switch_to.window(self.main_page)
         self.driver.switch_to.default_content()
@@ -489,6 +490,8 @@ if __name__=="__main__":
     queries.storeTBL(pcNumbers)
     print(f'{pcNumbers[0]} is the first PC')
     task.clickPC()
+    task.inputDate(queries.date)
+    task.click('wrqtr_hour_sales_activity__AutoRunReport')
     time.sleep(5)
     task.driver.quit()
 
