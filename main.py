@@ -23,6 +23,7 @@ class sqlQueries(config):
         super().__init__()
         self.date = '' #for inputting
         self.dateDotNotation = None #for scraping
+        self.selectedDate = None
 
     def storeTBL(self, pcNumbers):
         for pcNumber in pcNumbers:
@@ -50,28 +51,28 @@ class sqlQueries(config):
                     sys.exit('Date argument should be in numbers not string')
                     self.driver.quit()
                     exit()
-            selectedDate=datetime.date(manual['year'], manual['month'], manual['day'])
+            self.selectedDate=datetime.date(manual['year'], manual['month'], manual['day'])
 
         elif hour >= 23: #the half of the day
-            selectedDate = get_past_date('today')
+            self.selectedDate = get_past_date('today')
             print("use today's date")
 
         elif hour < 23: #the other half of the day
-            selectedDate = get_past_date('yesterday')
+            self.selectedDate = get_past_date('yesterday')
             print("use yesterday's date")
 
-        if selectedDate>get_past_date('today'):
+        if self.selectedDate>get_past_date('today'):
             sys.exit('Incorrect date argument')
             exit()
 
         cursor = self.mydb.cursor()
         delete = 0
-        self.date = selectedDate.strftime('%x') #local version of date 12/31/2020
-        month = selectedDate.strftime('%B') #December
-        DOW = selectedDate.strftime('%a') #Wed
-        day = selectedDate.strftime('%d') #31
-        year = selectedDate.strftime('%Y') #2020
-        dayofyear=int(selectedDate.strftime('%j')) #356
+        self.date = self.selectedDate.strftime('%x') #local version of date 12/31/2020
+        month = self.selectedDate.strftime('%B') #December
+        DOW = self.selectedDate.strftime('%a') #Wed
+        day = self.selectedDate.strftime('%d') #31
+        year = self.selectedDate.strftime('%Y') #2020
+        dayofyear=int(self.selectedDate.strftime('%j')) #356
         self.date = self.date[:6] + year #adds the year in full, "2021" instead of "21"
         self.dateDotNotation = self.date.replace('/', '.')
         print(self.date) #12/31/2020
@@ -80,27 +81,17 @@ class sqlQueries(config):
         try:
             leapday = datetime.date(int(year),2,29)
             print("Leap year = yes")
-            if (selectedDate==leapday):
+            if (self.selectedDate==leapday):
                 dayofyear=29.1
-            elif(selectedDate>leapday):
+            elif(self.selectedDate>leapday):
                 dayofyear-=1
         except ValueError:
             print("Leap year = no")
 
-        try:
-            sql = 'INSERT INTO DateTBL (`Date`,`DOW`,`TOD`,`Month`,`Day`,`Year`,`Day of Year`) VALUES (%s,%s,%s,%s,%s,%s,%s)'
-            values = [str(selectedDate.isoformat()),DOW,'',month,day,year,dayofyear]
-            cursor.execute(sql,values)
-            self.mydb.commit()
-        except self.MySQLdb._exceptions.IntegrityError:
-            print('Date already exists in DateTBL.. deleting date and truncating TempTable')
-            #self.sqlFile('Temp','TempTable Truncate.txt')
-            delete=1
-
-        if delete==1:
-            #self.deleteDayForItems(selectedDate)
-            print('Done. \n ')
-
+        sql = 'INSERT INTO DateTBL (`Date`,`DOW`,`TOD`,`Month`,`Day`,`Year`,`Day of Year`) VALUES (%s,%s,%s,%s,%s,%s,%s)'
+        values = [str(self.selectedDate.isoformat()),DOW,'',month,day,year,dayofyear]
+        cursor.execute(sql,values)
+        self.mydb.commit()
         cursor.close()
 
     def sqlFile(self, folder, file):
@@ -122,7 +113,7 @@ class sqlQueries(config):
         self.mydb.commit()
         cursor.close()
 
-    def deleteDayForItems(self, dateSTR):
+    def deleteDayForItems(self):
         cursor = self.mydb.cursor()
         dirList = os.listdir(self.getDirectory() + fr'\Consumption Table Queries\Insert Queries')
 
@@ -144,7 +135,14 @@ class sqlQueries(config):
                     #print(sql) #checks sql
                     cursor.execute(sql)
                     self.mydb.commit()
-        sql=f"DELETE FROM LeftoversTBL WHERE `Date` = '{dateSTR}'"
+        sql=f"DELETE FROM LeftoversTBL WHERE `Date` = '{self.selectedDate}'"
+        cursor.execute(sql)
+        self.mydb.commit()
+        cursor.close()
+
+    def deleteDayForQuarter(self):
+        cursor=self.mydb.cursor()
+        sql=f"DELETE FROM QuarterlyHourTBL WHERE `Date`='{self.selectedDate}';"
         cursor.execute(sql)
         self.mydb.commit()
         cursor.close()
@@ -423,15 +421,19 @@ def get_past_date(str_days_ago):
 if __name__=="__main__":
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     queries = sqlQueries()
-    queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+    try:
+        queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+    except queries.MySQLdb._exceptions.IntegrityError:
+        print('Date exists, deleting quarters associated with it...')
+        queries.deleteDayForQuarter()
     task = QuarterlyHour(root)
     task.login()
     task.clickQuarterlySales()
     task.clickPCOptions('lookupSite_image')
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
-    task.clickPC()
     print(f'{pcNumbers[0]} is the first PC')
+    task.clickPC()
     task.inputDate(queries.date)
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
     task = scrapeQuarterlyHour(task.driver, queries.date,task.oddCount, task.evenCount)
