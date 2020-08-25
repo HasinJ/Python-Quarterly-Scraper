@@ -1,5 +1,4 @@
 
-
 class config():
     def __init__(self):
         import MySQLdb
@@ -12,10 +11,17 @@ class config():
         self.__RDSPass = StringVar()
         self.__RDSDb = StringVar()
 
-        self.mydb = MySQLdb.connect(host = self.__RDSHost,
+        self.MySQLdb = MySQLdb
+        self.mydb = self.MySQLdb.connect(host = self.__RDSHost,
             user = self.__RDSUser,
             passwd = self.__RDSPass,
             db = self.__RDSDb)
 
     def getDirectory(self):
         return self.__directory
+
+    def getRadUser(self):
+        return self.__radUser
+
+    def getRadPass(self):
+        return self.__radPass
