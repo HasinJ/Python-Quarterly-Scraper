@@ -439,7 +439,6 @@ def startingTimer():
         time.sleep(1)
 
 if __name__=="__main__":
-    """
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     queries = sqlQueries()
@@ -459,7 +458,7 @@ if __name__=="__main__":
     task.clickPC()
     task.inputDate(queries.date)
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
-    task = scrapeQuarterlyHour(task.driver, queries.date,task.oddCount, task.evenCount)
+    task = scrapeQuarterlyHour(task.driver,queries.date,task.oddCount,task.evenCount)
     task.scrape(task.driver.page_source)
     queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
     for pcNumber in pcNumbers:
@@ -470,8 +469,8 @@ if __name__=="__main__":
         task.scrape(task.driver.page_source)
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
-    """
 
+"""
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     queries = sqlQueries()
@@ -494,5 +493,6 @@ if __name__=="__main__":
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
     time.sleep(5)
     task.driver.quit()
+"""
 
     exit()
