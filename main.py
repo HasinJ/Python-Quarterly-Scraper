@@ -16,6 +16,7 @@ import os
 from os import path
 from config import config
 from bs4 import BeautifulSoup
+from dateutil.relativedelta import relativedelta
 
 
 class sqlQueries(config):
@@ -315,9 +316,11 @@ class ConsumptionTables(Radiant):
         dropdown.send_keys(Keys.ENTER)
         time.sleep(1)
 
+
 class DDailySummary(Radiant):
     def __init__(self,driver):
         super().__init__(driver)
+
 
 class scrapeQuarterlyHour(QuarterlyHour):
     def __init__(self,driver,date,oddCount,evenCount):
@@ -443,7 +446,7 @@ if __name__=="__main__":
     startingTimer()
     queries = sqlQueries()
     try:
-        queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+        queries.dateTBL() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
     except queries.MySQLdb._exceptions.IntegrityError:
         print('Date exists, deleting quarters associated with it...')
         queries.deleteDayForQuarter()
@@ -469,7 +472,7 @@ if __name__=="__main__":
         task.scrape(task.driver.page_source)
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
-
+    exit()
 """
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
@@ -494,5 +497,3 @@ if __name__=="__main__":
     time.sleep(5)
     task.driver.quit()
 """
-
-    exit()
