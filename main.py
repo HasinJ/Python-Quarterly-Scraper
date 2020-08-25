@@ -376,7 +376,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
 
     def dump(self,pcNumber):
         #checks for folder existence
-        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour'
+        directory=self.getDirectory()
         if path.isdir(directory + fr'\Reports\Quarterly Hours')==False:
             if path.isdir(directory + fr'\Reports')==False:
                 os.mkdir(directory + fr'\Reports')
@@ -386,7 +386,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
             os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
 
         #checks for .json existence
-        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
+        directory=self.getDirectory() + fr'\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
         if path.exists(directory + 'Output.json')==False:
             with open(directory + 'Output.json','w') as f:
                 json.dump(self.data,f)
