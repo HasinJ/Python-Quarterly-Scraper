@@ -17,6 +17,18 @@ class config():
             passwd = self.__RDSPass,
             db = self.__RDSDb)
 
+    def logger(self,date,fullDate):
+        import logging
+        import os
+        global print
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        logger = logging.getLogger()
+        if os.path.isdir(self.__directory + fr'\Logs')==False:
+                os.mkdir(self.__directory + fr'\Logs')
+        logger.addHandler(logging.FileHandler(self.__directory+fr'\Logs\{date}.txt', 'a'))
+        print = logger.info
+        print(fr'[{fullDate}]')
+
     def getDirectory(self):
         return self.__directory
 
