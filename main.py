@@ -13,7 +13,7 @@ import json
 import pandas as pd
 import math
 import os
-from os import path
+import logging
 from config import config
 from bs4 import BeautifulSoup
 from dateutil.relativedelta import relativedelta
@@ -76,6 +76,7 @@ class sqlQueries(config):
         dayofyear=int(self.selectedDate.strftime('%j')) #356
         self.date = self.date[:6] + year #adds the year in full, "2021" instead of "21"
         self.dateDotNotation = self.date.replace('/', '.')
+        self.logger(self.dateDotNotation,self.selectedDate.strftime('%c'))
         print(self.date) #12/31/2020
 
         #leap year
@@ -123,7 +124,7 @@ class sqlQueries(config):
             tableName = file.split(' ')[0]
             sql=fr'DELETE FROM {tableName} '
             destination = self.getDirectory() + fr'\Consumption Table Queries\Insert Queries\{file}'
-            if path.exists(destination)==True:
+            if os.path.exists(destination)==True:
                 with open(destination) as f:
                     while True:
                         line = f.readline()
@@ -217,27 +218,12 @@ class Radiant(config):
         self.main_page = switchHandle(self.driver)
         self.setWait(self.driver,5)
         time.sleep(1)
-        frame = self.getWait().until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
-        self.driver.switch_to.frame(frame)
-        self.setWait(self.driver,5)
-        time.sleep(1)
 
-    def clickPC(self,index=1):
-        time.sleep(1)
-        even = self.driver.find_elements_by_class_name('gridRowEven')
-        odd = self.driver.find_elements_by_class_name('gridRowOdd')
-
-        if index/2 == math.floor(index/2):
-            print('even...')
-            ActionChains(self.driver).move_to_element(even[self.evenCount]).click(even[self.evenCount]).perform()
-            self.evenCount += 1
-
-        elif index/2 != math.floor(index/2):
-            print('odd...')
-            ActionChains(self.driver).move_to_element(odd[self.oddCount]).click(odd[self.oddCount]).perform()
-            self.oddCount += 1
-
-        self.backToReportOptions()
+    def inputPCNumber(self,PC):
+        print(f'\nPCNumber: {PC}')
+        inputBox=self.getWait().until(EC.presence_of_element_located((By.ID, 'lookupSite')))
+        inputBox.clear()
+        inputBox.send_keys(PC)
 
     def click(self,id):
         run = self.getWait().until(EC.element_to_be_clickable((By.ID, f"{id}")))
@@ -272,6 +258,11 @@ class Radiant(config):
         print('Switched. \n')
 
     def handlePCNumbers(self):
+        frame = self.getWait().until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
+        self.driver.switch_to.frame(frame)
+        self.setWait(self.driver,5)
+        time.sleep(1)
+
         soup = BeautifulSoup(self.driver.page_source,'html.parser')
         table = soup.find(id="grdHierarchy")
         rows = table.findAll(True, {'class':['gridRowOdd', 'gridRowEven']})
@@ -279,9 +270,13 @@ class Radiant(config):
         for index in range(len(rows)):
             dataCell = rows[index].find(class_='gridCell')
             self.__pcNumbers.insert(index, dataCell.text.strip())
-        if len(rows) == len(self.__pcNumbers):
-            time.sleep(1) #it'll wait once the pcNumbers are saved into pcNumbers array
-            return self.__pcNumbers
+
+        time.sleep(1)
+        close = self.getWait().until(EC.presence_of_element_located((By.ID, 'waCancel')))
+        ActionChains(self.driver).move_to_element(close).click(close).perform()
+        time.sleep(1)
+        self.backToReportOptions()
+        return self.__pcNumbers
 
     def setWait(self,driver,time): #needs to be set everytime driver changes
         self.__wait = WebDriverWait(driver,time)
@@ -377,17 +372,17 @@ class scrapeQuarterlyHour(QuarterlyHour):
     def dump(self,pcNumber):
         #checks for folder existence
         directory=self.getDirectory()
-        if path.isdir(directory + fr'\Reports\Quarterly Hours')==False:
-            if path.isdir(directory + fr'\Reports')==False:
+        if os.path.isdir(directory + fr'\Reports\Quarterly Hours')==False:
+            if os.path.isdir(directory + fr'\Reports')==False:
                 os.mkdir(directory + fr'\Reports')
             os.mkdir(directory + fr'\Reports\Quarterly Hours')
             os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
-        elif path.isdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')==False:
+        elif os.path.isdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')==False:
             os.mkdir(directory + fr'\Reports\Quarterly Hours\{pcNumber}')
 
         #checks for .json existence
         directory=self.getDirectory() + fr'\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
-        if path.exists(directory + 'Output.json')==False:
+        if os.path.exists(directory + 'Output.json')==False:
             with open(directory + 'Output.json','w') as f:
                 json.dump(self.data,f)
             df = pd.read_json(open(directory + 'Output.json','r'))
@@ -458,7 +453,7 @@ if __name__=="__main__":
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
     print(f'{pcNumbers[0]} is the first PC')
-    task.clickPC()
+    task.inputPCNumber(pcNumbers[0])
     task.inputDate(queries.date)
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
     task = scrapeQuarterlyHour(task.driver,queries.date,task.oddCount,task.evenCount)
@@ -466,8 +461,7 @@ if __name__=="__main__":
     queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
     for pcNumber in pcNumbers:
         task.click('wrqtr_hour_sales_activity__Options') #goes back to report options
-        task.clickPCOptions('lookupSite_image')
-        task.clickPC(pcNumbers.index(pcNumber))
+        task.inputPCNumber(pcNumber)
         task.click('wrqtr_hour_sales_activity__AutoRunReport')
         task.scrape(task.driver.page_source)
         queries.quarterlyHourTBL(pcNumber,task.columns)
@@ -491,7 +485,7 @@ if __name__=="__main__":
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
     print(f'{pcNumbers[0]} is the first PC')
-    task.clickPC()
+    task.inputPCNumber(pcNumbers[0])
     task.inputDate(queries.date)
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
     time.sleep(5)
