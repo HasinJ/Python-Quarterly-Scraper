@@ -14,6 +14,7 @@ import pandas as pd
 import math
 import os
 import logging
+import sys
 from config import config
 from bs4 import BeautifulSoup
 from dateutil.relativedelta import relativedelta
@@ -22,9 +23,10 @@ from dateutil.relativedelta import relativedelta
 class sqlQueries(config):
     def __init__(self):
         super().__init__()
-        self.date = '' #for inputting
+        self.date = None #for inputting
         self.dateDotNotation = None #for scraping
         self.selectedDate = None
+        self.fullDate = None
 
     def storeTBL(self, pcNumbers):
         for pcNumber in pcNumbers:
@@ -43,7 +45,34 @@ class sqlQueries(config):
                 continue
         print('\n')
 
-    def dateTBL(self, manual='no'):
+    def dateTBL(self):
+        cursor = self.mydb.cursor()
+        delete = 0
+        month = self.selectedDate.strftime('%B') #December
+        DOW = self.selectedDate.strftime('%a') #Wed
+        day = self.selectedDate.strftime('%d') #31
+        year = self.selectedDate.strftime('%Y') #2020
+        dayofyear=int(self.selectedDate.strftime('%j')) #356
+        print(self.date) #12/31/2020
+
+        #leap year
+        try:
+            leapday = datetime.date(int(year),2,29)
+            print("Leap year = yes")
+            if (self.selectedDate==leapday):
+                dayofyear=29.1
+            elif(self.selectedDate>leapday):
+                dayofyear-=1
+        except ValueError:
+            print("Leap year = no")
+
+        sql = 'INSERT INTO DateTBL (`Date`,`DOW`,`TOD`,`Month`,`Day`,`Year`,`Day of Year`) VALUES (%s,%s,%s,%s,%s,%s,%s)'
+        values = [str(self.selectedDate.isoformat()),DOW,'',month,day,year,dayofyear]
+        cursor.execute(sql,values)
+        self.mydb.commit()
+        cursor.close()
+
+    def chooseDay(self, manual='no'):
         hour = int(datetime.datetime.now().strftime('%H'))
 
         if manual!='no':
@@ -66,35 +95,11 @@ class sqlQueries(config):
             sys.exit('Incorrect date argument')
             exit()
 
-        cursor = self.mydb.cursor()
-        delete = 0
-        self.date = self.selectedDate.strftime('%x') #local version of date 12/31/2020
-        month = self.selectedDate.strftime('%B') #December
-        DOW = self.selectedDate.strftime('%a') #Wed
-        day = self.selectedDate.strftime('%d') #31
-        year = self.selectedDate.strftime('%Y') #2020
-        dayofyear=int(self.selectedDate.strftime('%j')) #356
-        self.date = self.date[:6] + year #adds the year in full, "2021" instead of "21"
+        self.date = self.selectedDate.strftime('%x') #local version of date 12/31/21
+        self.date = self.date[:6] + self.selectedDate.strftime('%Y') #adds the year in full, "2021" instead of "21"
+        self.fullDate = self.selectedDate.strftime('%c')
         self.dateDotNotation = self.date.replace('/', '.')
-        self.logger(self.dateDotNotation,self.selectedDate.strftime('%c'))
-        print(self.date) #12/31/2020
 
-        #leap year
-        try:
-            leapday = datetime.date(int(year),2,29)
-            print("Leap year = yes")
-            if (self.selectedDate==leapday):
-                dayofyear=29.1
-            elif(self.selectedDate>leapday):
-                dayofyear-=1
-        except ValueError:
-            print("Leap year = no")
-
-        sql = 'INSERT INTO DateTBL (`Date`,`DOW`,`TOD`,`Month`,`Day`,`Year`,`Day of Year`) VALUES (%s,%s,%s,%s,%s,%s,%s)'
-        values = [str(self.selectedDate.isoformat()),DOW,'',month,day,year,dayofyear]
-        cursor.execute(sql,values)
-        self.mydb.commit()
-        cursor.close()
 
     def sqlFile(self, folder, file):
         cursor = self.mydb.cursor()
@@ -436,12 +441,30 @@ def startingTimer():
         print(i+1)
         time.sleep(1)
 
+def ExceptionHandler(type, value, tb):
+    logger.exception("Error: {0}".format(str(value)))
+
 if __name__=="__main__":
+    queries = sqlQueries()
+    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+
+
+    #logger
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logger = logging.getLogger()
+    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
+            os.mkdir(queries.getDirectory() + fr'\Logs')
+    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
+    print = logger.info
+    sys.excepthook = ExceptionHandler
+    print(f'\n[{queries.date}]')
+
+
+    print('Quarterly Hour Reports')
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
-    queries = sqlQueries()
     try:
-        queries.dateTBL() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+        queries.dateTBL()
     except queries.MySQLdb._exceptions.IntegrityError:
         print('Date exists, deleting quarters associated with it...')
         queries.deleteDayForQuarter()
@@ -467,12 +490,25 @@ if __name__=="__main__":
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
     exit()
+
 """
+    print('\nProduct Mix Reports')
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     queries = sqlQueries()
+    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+
+    #logger
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logger = logging.getLogger()
+    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
+            os.mkdir(queries.getDirectory() + fr'\Logs')
+    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
+    print = logger.info
+    print(fr'[{queries.date}]')
+
     try:
-        queries.dateTBL({'year':2020, 'month':2, 'day':2}) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+        queries.dateTBL()
     except queries.MySQLdb._exceptions.IntegrityError:
         print('Date exists, deleting quarters associated with it... (not really)')
         #queries.deleteDayForQuarter()
