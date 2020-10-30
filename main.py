@@ -274,6 +274,11 @@ class Radiant(config):
 
         for index in range(len(rows)):
             dataCell = rows[index].find(class_='gridCell')
+
+            if("Closed" in dataCell.text.strip()):
+                print(rows.pop(index))
+                continue
+
             self.__pcNumbers.insert(index, dataCell.text.strip())
 
         time.sleep(1)
