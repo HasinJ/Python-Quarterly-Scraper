@@ -224,9 +224,9 @@ class Radiant(config):
         self.setWait(self.driver,5)
         time.sleep(1)
 
-    def inputPCNumber(self,PC):
+    def inputPCNumber(self,PC,id):
         print(f'\nPCNumber: {PC}')
-        inputBox=self.getWait().until(EC.presence_of_element_located((By.ID, 'lookupSite')))
+        inputBox=self.getWait().until(EC.presence_of_element_located((By.ID, f'{id}')))
         inputBox.clear()
         inputBox.send_keys(PC)
 
@@ -235,16 +235,20 @@ class Radiant(config):
         ActionChains(self.driver).move_to_element(run).click(run).perform()
         time.sleep(2)
 
-    def inputDate(self,date):
-        self.click('lkupDates_image')
+    def inputDate(self,date,id):
+        self.click(f'{id}')
         self.main_page=switchHandle(self.driver)
         self.setWait(self.driver,5) #needs to be set everytime driver changes
         frame = self.getWait().until(EC.presence_of_element_located((By.ID, 'renderFrame'))) #frame inside the modal box
         self.driver.switch_to.frame(frame)
         self.setWait(self.driver,5) #needs to be set everytime driver changes
+        time.sleep(5)
         dateBox = self.getWait().until(EC.presence_of_element_located((By.ID, 'calStartDay')))
+        dateBox.clear()
         dateBox.send_keys(date)
+        time.sleep(5)
         dateBox = self.getWait().until(EC.presence_of_element_located((By.ID, 'calEndDay')))
+        dateBox.clear()
         dateBox.send_keys(date)
         self.click('waSaveClose')
         time.sleep(1)
@@ -325,7 +329,6 @@ class ConsumptionTables(Radiant):
 class DDailySummary(Radiant):
     def __init__(self,driver):
         super().__init__(driver)
-
 
 class scrapeQuarterlyHour(QuarterlyHour):
     def __init__(self,driver,date,oddCount,evenCount):
@@ -450,6 +453,7 @@ def ExceptionHandler(type, value, tb):
     logger.exception("Error: {0}".format(str(value)))
 
 if __name__=="__main__":
+    """
     queries = sqlQueries()
     queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
 
@@ -457,6 +461,8 @@ if __name__=="__main__":
     #logger
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     logger = logging.getLogger()
+    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
+            os.mkdir(queries.getDirectory() + fr'\Logs')
     if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
             os.mkdir(queries.getDirectory() + fr'\Logs')
     logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
@@ -495,8 +501,9 @@ if __name__=="__main__":
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
     exit()
+    """
 
-"""
+    """
     print('\nProduct Mix Reports')
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
@@ -526,9 +533,43 @@ if __name__=="__main__":
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
     print(f'{pcNumbers[0]} is the first PC')
-    task.inputPCNumber(pcNumbers[0])
-    task.inputDate(queries.date)
+    task.inputPCNumber(pcNumbers[0],"lookupSite")
+    task.inputDate(queries.date,'lkupDates_image')
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
     time.sleep(5)
     task.driver.quit()
-"""
+    """
+    print('\nDunkin Daily Summary')
+    queries = sqlQueries()
+    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+
+    #logger
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logger = logging.getLogger()
+    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
+            os.mkdir(queries.getDirectory() + fr'\Logs')
+    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
+    print = logger.info
+    print(fr'[{queries.date}]')
+
+    root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
+    startingTimer()
+    try:
+        queries.dateTBL()
+    except queries.MySQLdb._exceptions.IntegrityError:
+        print('Date exists, deleting quarters associated with it... (not really)')
+        print('Done \n')
+    task = DDailySummary(root);
+    task.login()
+    task.clickTaskOption("Node_1018698_0")
+    task.clickPCOptions('__lufBusUnit_image')
+    pcNumbers = task.handlePCNumbers()
+    queries.storeTBL(pcNumbers)
+    print(f'{pcNumbers[0]} is the first PC')
+    task.inputPCNumber(pcNumbers[0],"__lufBusUnit")
+    task.inputDate(queries.date,'wlfTimePeriod_image')
+    task.click('wrDailySummary__AutoRunReport')
+    time.sleep(3)
+    soup = BeautifulSoup(task.driver.page_source, 'html.parser')
+    print(soup.prettify())
+    task.driver.quit()
