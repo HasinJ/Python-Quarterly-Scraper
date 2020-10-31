@@ -109,24 +109,54 @@ class scrapeDDailySummary():
             i+=1
         table = table.parent
 
-        print(self.columns)
-
         #rows
         table=table.find_next_sibling("tbody")
         rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
         print(rows[1])
 
 
-
+        for row in rows:
+            cell = dict()
+            cell['PCNumber']=pcNumber
+            cell['Date']=self.__date
+            for i in range(len(self.columns)):
+                field=row.select('.CellStyle')[i]
+                text = field.text.strip()
+                text=text.replace('%','').replace('$','').replace(',','')
+                self.columns[i] = self.columns[i].replace('%',"Percent")
+                cell[self.columns[i]] = text
+            self.data.append(cell)
+            self.dump(pcNumber)
 
     def dump(self,pcNumber):
-        pass
+        import json
+        import pandas as pd
+        import os
+        from os import path
+
+        #checks for folder existence
+        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour'
+        if os.path.isdir(directory + fr'\Reports\DDaily Summaries')==False:
+            if os.path.isdir(directory + fr'\Reports')==False:
+                os.mkdir(directory + fr'\Reports')
+            os.mkdir(directory + fr'\Reports\DDaily Summaries')
+            os.mkdir(directory + fr'\Reports\DDaily Summaries\{pcNumber}')
+        elif os.path.isdir(directory + fr'\Reports\DDaily Summaries\{pcNumber}')==False:
+            os.mkdir(directory + fr'\Reports\DDaily Summaries\{pcNumber}')
+
+        #checks for .json existence
+        directory=fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour' + fr'\Reports\DDaily Summaries\{pcNumber}\{self.__date}'
+        with open(directory + 'Output.json','w') as f:
+            json.dump(self.data,f)
+        df = pd.read_json(open(directory + 'Output.json','r'))
+        df.to_csv(directory + 'dataframe.csv', index=False, header=True)
 
 """
 test = scrapeQuarterlyHour()
 test.scrape()
-print(test.columns)
+"""
 
+"""
 insert=f''
 values=f''
 for i in range(len(test.columns)):

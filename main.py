@@ -395,22 +395,81 @@ class scrapeQuarterlyHour(QuarterlyHour):
 
         #checks for .json existence
         directory=self.getDirectory() + fr'\Reports\Quarterly Hours\{pcNumber}\{self.__date}'
-        if os.path.exists(directory + 'Output.json')==False:
-            with open(directory + 'Output.json','w') as f:
-                json.dump(self.data,f)
-            df = pd.read_json(open(directory + 'Output.json','r'))
-            df.to_csv(directory + 'dataframe.csv', index=False, header=True)
+        with open(directory + 'Output.json','w') as f:
+            json.dump(self.data,f)
+        df = pd.read_json(open(directory + 'Output.json','r'))
+        df.to_csv(directory + 'dataframe.csv', index=False, header=True)
 
 
 class scrapeDDailySummary(DDailySummary):
-    def __init__(self,driver,date, odd, even, oddCount, evenCount):
+    def __init__(self,driver,date,oddCount,evenCount):
         super().__init__(driver)
-        self._html = driver.page_source
-        self.__date = date
+        self.__date = date.replace('/',".")
+        self.oddCount = oddCount
+        self.evenCount = evenCount
+        self.data=[]
+        self.columns=[]
+
+
+    def scrape(self,html):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html,'html.parser')
         self.data=[]
 
-    def scrape(self):
-        pass
+        #pc number
+        table = soup.find(id="ReportHeader").find('div',attrs={'align':'left'})
+        pcNumber=table.text.strip().split(" ")[2]
+        print(pcNumber);
+
+        #column names
+        table = soup.find(id="id_dest_destinations").parent
+        self.columns=table.select('.CellStyle')
+        i=0
+        for column in self.columns:
+            self.columns[i]=column.text.strip().replace(' ','')
+            i+=1
+        table = table.parent
+
+        #rows
+        table=table.find_next_sibling("tbody")
+        rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
+
+
+        for row in rows:
+            cell = dict()
+            cell['PCNumber']=pcNumber
+            cell['Date']=self.__date
+            for i in range(len(self.columns)):
+                field=row.select('.CellStyle')[i]
+                text = field.text.strip()
+                text=text.replace('%','').replace('$','').replace(',','')
+                self.columns[i] = self.columns[i].replace('%',"Percent")
+                cell[self.columns[i]] = text
+            self.data.append(cell)
+            self.dump(pcNumber)
+
+    def dump(self,pcNumber):
+        import json
+        import pandas as pd
+        import os
+        from os import path
+
+        #checks for folder existence
+        directory=self.getDirectory()
+        if os.path.isdir(directory + fr'\Reports\DDaily Summaries')==False:
+            if os.path.isdir(directory + fr'\Reports')==False:
+                os.mkdir(directory + fr'\Reports')
+            os.mkdir(directory + fr'\Reports\DDaily Summaries')
+            os.mkdir(directory + fr'\Reports\DDaily Summaries\{pcNumber}')
+        elif os.path.isdir(directory + fr'\Reports\DDaily Summaries\{pcNumber}')==False:
+            os.mkdir(directory + fr'\Reports\DDaily Summaries\{pcNumber}')
+
+        #checks for .json existence
+        directory=self.getDirectory() + fr'\Reports\DDaily Summaries\{pcNumber}\{self.__date}'
+        with open(directory + 'Output.json','w') as f:
+            json.dump(self.data,f)
+        df = pd.read_json(open(directory + 'Output.json','r'))
+        df.to_csv(directory + 'dataframe.csv', index=False, header=True)
 
 
 #polymorphism
@@ -453,10 +512,9 @@ def ExceptionHandler(type, value, tb):
     logger.exception("Error: {0}".format(str(value)))
 
 if __name__=="__main__":
-    """
+
     queries = sqlQueries()
     queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
-
 
     #logger
     logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -471,7 +529,8 @@ if __name__=="__main__":
     print(f'\n[{queries.date}]')
 
 
-    print('Quarterly Hour Reports')
+    """
+    print('\nQuarterly Hour Reports')
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     try:
@@ -487,7 +546,7 @@ if __name__=="__main__":
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
     print(f'{pcNumbers[0]} is the first PC')
-    task.inputPCNumber(pcNumbers[0])
+    task.inputPCNumber(pcNumbers[0],"lookupSite")
     task.inputDate(queries.date)
     task.click('wrqtr_hour_sales_activity__AutoRunReport')
     task = scrapeQuarterlyHour(task.driver,queries.date,task.oddCount,task.evenCount)
@@ -495,13 +554,14 @@ if __name__=="__main__":
     queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
     for pcNumber in pcNumbers:
         task.click('wrqtr_hour_sales_activity__Options') #goes back to report options
-        task.inputPCNumber(pcNumber)
+        task.inputPCNumber(pcNumber,"lookupSite")
         task.click('wrqtr_hour_sales_activity__AutoRunReport')
         task.scrape(task.driver.page_source)
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
-    exit()
+
     """
+
 
     """
     print('\nProduct Mix Reports')
@@ -509,15 +569,6 @@ if __name__=="__main__":
     startingTimer()
     queries = sqlQueries()
     queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
-
-    #logger
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
-    logger = logging.getLogger()
-    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
-            os.mkdir(queries.getDirectory() + fr'\Logs')
-    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
-    print = logger.info
-    print(fr'[{queries.date}]')
 
     try:
         queries.dateTBL()
@@ -539,19 +590,8 @@ if __name__=="__main__":
     time.sleep(5)
     task.driver.quit()
     """
+
     print('\nDunkin Daily Summary')
-    queries = sqlQueries()
-    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
-
-    #logger
-    logging.basicConfig(level=logging.INFO, format='%(message)s')
-    logger = logging.getLogger()
-    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
-            os.mkdir(queries.getDirectory() + fr'\Logs')
-    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
-    print = logger.info
-    print(fr'[{queries.date}]')
-
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     try:
@@ -569,7 +609,10 @@ if __name__=="__main__":
     task.inputPCNumber(pcNumbers[0],"__lufBusUnit")
     task.inputDate(queries.date,'wlfTimePeriod_image')
     task.click('wrDailySummary__AutoRunReport')
-    time.sleep(3)
-    soup = BeautifulSoup(task.driver.page_source, 'html.parser')
-    print(soup.prettify())
+    task = scrapeDDailySummary(task.driver,queries.date,task.oddCount,task.evenCount)
+    task.scrape(task.driver.page_source)
+    #queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
+
+
+    time.sleep(2)
     task.driver.quit()
