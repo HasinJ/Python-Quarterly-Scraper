@@ -18,6 +18,7 @@ class scrapeQuarterlyHour():
         pcNumber=table.text.strip().split(" ")[2]
 
         table = soup.find_all(class_='TableStyle')
+
         #column names
         self.columns=table[0]
         self.columns=self.columns.select('.CellStyle')
@@ -25,6 +26,7 @@ class scrapeQuarterlyHour():
         for column in self.columns:
             self.columns[i]=column.text.strip().replace(' ','')
             i+=1
+
         #rows
         table=table[1]
         rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
@@ -77,15 +79,50 @@ class scrapeQuarterlyHour():
 
 class scrapeDDailySummary():
     def __init__(self):
-        #self._html = driver.page_source'
-        self._html = open(fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour' + fr'\report.html','rb') # 'rb' stands for read-binary, write-binary needs chmoding, this also needs to be changed for Selenium (needs to have date)
-        #self._date = date
-        print('the commented line above this needs to be figured out')
+        #super().__init__(driver)
+        #self.__date = date
+        #self.oddCount=oddCount
+        #self.evenCount=evenCount
+        #self.data=[]
+        #self.columns=[]
+        self._html = open(fr'C:\Users\Hasin Choudhury\Desktop\pythonQuarterlyHour' + fr'\reportDDaily.html','rb') # 'rb' stands for read-binary, write-binary needs chmoding, this also needs to be changed for Selenium (needs to have date)
+        self.data=[]
+        self.columns=[]
+        self.__date='10.30.2020'
 
     def scrape(self):
         from bs4 import BeautifulSoup
+        soup = BeautifulSoup(self._html,'html.parser')
+        self.data=[]
+
+        #pc number
+        table = soup.find(id="ReportHeader").find('div',attrs={'align':'left'})
+        pcNumber=table.text.strip().split(" ")[2]
+        print(pcNumber);
+
+        #column names
+        table = soup.find(id="id_dest_destinations").parent
+        self.columns=table.select('.CellStyle')
+        i=0
+        for column in self.columns:
+            self.columns[i]=column.text.strip().replace(' ','')
+            i+=1
+        table = table.parent
+
+        print(self.columns)
+
+        #rows
+        table=table.find_next_sibling("tbody")
+        rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
+        print(rows[1])
+
+
+
+
+    def dump(self,pcNumber):
         pass
 
+"""
 test = scrapeQuarterlyHour()
 test.scrape()
 print(test.columns)
@@ -99,3 +136,7 @@ insert=insert.replace('%','Percent')
 sql=f'INSERT INTO QuarterlyHourTBL ({insert[:-1]}) VALUES ({values[:-1]})'
 print(sql)
 ['TimePeriodBegins', 'NetSales', 'TransCount', 'EstimatedLaborCost', 'LaborHours', 'LaborCost%NetSales', 'NetSales/LaborHour', 'Trans/LaborHour']
+"""
+
+test = scrapeDDailySummary()
+test.scrape()
