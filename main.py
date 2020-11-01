@@ -154,6 +154,14 @@ class sqlQueries(config):
         self.mydb.commit()
         cursor.close()
 
+    def deleteDayForDigital(self):
+        cursor=self.mydb.cursor()
+        sql=f"DELETE FROM DigitalTBL WHERE `Date`='{self.selectedDate}';"
+        cursor.execute(sql)
+        self.mydb.commit()
+        cursor.close()
+
+
     def quarterlyHourTBL(self,pcNumber,columns):
         import csv
         cursor = self.mydb.cursor()
@@ -167,6 +175,24 @@ class sqlQueries(config):
         sql=f'INSERT INTO QuarterlyHourTBL ({insert[:-1]}) VALUES ({values[:-1]})'
 
         csv_data = csv.reader(open(self.getDirectory() + fr'\Reports\Quarterly Hours\{pcNumber}\{self.dateDotNotation}dataframe.csv'))
+        next(csv_data) #to ignore header
+        for row in csv_data:
+           cursor.execute(sql, row)
+        self.mydb.commit()
+        cursor.close()
+
+    def digitalTBL(self,pcNumber,columns):
+        import csv
+        cursor = self.mydb.cursor()
+
+        insert=f''
+        values=f''
+        for i in range(len(columns)):
+            insert+=f'`{columns[i]}`,'
+            values+=f'%s,'
+        insert=insert.replace('%','Percent')
+        sql=f'INSERT INTO DigitalTBL ({insert[:-1]}) VALUES ({values[:-1]})'
+        csv_data = csv.reader(open(self.getDirectory() + fr'\Reports\DDaily Summaries\{pcNumber}\{self.dateDotNotation}dataframe.csv'))
         next(csv_data) #to ignore header
         for row in csv_data:
            cursor.execute(sql, row)
@@ -280,7 +306,6 @@ class Radiant(config):
             dataCell = rows[index].find(class_='gridCell')
 
             if("Closed" in dataCell.text.strip()):
-                print(rows.pop(index))
                 continue
 
             self.__pcNumbers.insert(index, dataCell.text.strip())
@@ -374,7 +399,7 @@ class scrapeQuarterlyHour(QuarterlyHour):
                         self.__date=self.__date.replace('/','.')
                         self.columns=['PCNumber','Date']+self.columns
                         self.dump(pcNumber)
-                        return
+                        return #end
                     cell[self.columns[0]]=text
                     continue
                 start='yes'
@@ -419,21 +444,19 @@ class scrapeDDailySummary(DDailySummary):
         #pc number
         table = soup.find(id="ReportHeader").find('div',attrs={'align':'left'})
         pcNumber=table.text.strip().split(" ")[2]
-        print(pcNumber);
 
         #column names
         table = soup.find(id="id_dest_destinations").parent
         self.columns=table.select('.CellStyle')
-        i=0
+        i=0 #to skip PCnumber and date but still add to data
         for column in self.columns:
-            self.columns[i]=column.text.strip().replace(' ','')
+            self.columns[i]=column.text.strip().replace(' ','').replace('%',"Percent")
             i+=1
         table = table.parent
 
         #rows
         table=table.find_next_sibling("tbody")
         rows = table.findAll(True, {'class':['RowStyleData', 'RowStyleDataEven']})
-
 
         for row in rows:
             cell = dict()
@@ -443,10 +466,10 @@ class scrapeDDailySummary(DDailySummary):
                 field=row.select('.CellStyle')[i]
                 text = field.text.strip()
                 text=text.replace('%','').replace('$','').replace(',','')
-                self.columns[i] = self.columns[i].replace('%',"Percent")
                 cell[self.columns[i]] = text
             self.data.append(cell)
             self.dump(pcNumber)
+        self.columns = ['PCNumber','Date'] + self.columns
 
     def dump(self,pcNumber):
         import json
@@ -511,6 +534,7 @@ def startingTimer():
 def ExceptionHandler(type, value, tb):
     logger.exception("Error: {0}".format(str(value)))
 
+
 if __name__=="__main__":
 
     queries = sqlQueries()
@@ -526,10 +550,10 @@ if __name__=="__main__":
     logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
     print = logger.info
     sys.excepthook = ExceptionHandler
+
     print(f'\n[{queries.date}]')
 
 
-    """
     print('\nQuarterly Hour Reports')
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
@@ -539,6 +563,7 @@ if __name__=="__main__":
         print('Date exists, deleting quarters associated with it...')
         queries.deleteDayForQuarter()
         print('Done \n')
+
     task = QuarterlyHour(root)
     task.login()
     task.clickTaskOption("Node_1018702_0")
@@ -560,7 +585,7 @@ if __name__=="__main__":
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
 
-    """
+
 
 
     """
@@ -597,7 +622,8 @@ if __name__=="__main__":
     try:
         queries.dateTBL()
     except queries.MySQLdb._exceptions.IntegrityError:
-        print('Date exists, deleting quarters associated with it... (not really)')
+        print('Date exists, deleting digital data associated with it...')
+        queries.deleteDayForDigital()
         print('Done \n')
     task = DDailySummary(root);
     task.login()
@@ -611,7 +637,14 @@ if __name__=="__main__":
     task.click('wrDailySummary__AutoRunReport')
     task = scrapeDDailySummary(task.driver,queries.date,task.oddCount,task.evenCount)
     task.scrape(task.driver.page_source)
-    #queries.quarterlyHourTBL(pcNumbers.pop(0),task.columns)
+    queries.digitalTBL(pcNumbers.pop(0),task.columns)
+    for pcNumber in pcNumbers:
+        task.click("wrDailySummary__Options")
+        task.inputPCNumber(pcNumber,"__lufBusUnit")
+        task.inputDate(queries.date,'wlfTimePeriod_image')
+        task.click('wrDailySummary__AutoRunReport')
+        task.scrape(task.driver.page_source)
+        queries.digitalTBL(pcNumber,task.columns)
 
 
     time.sleep(2)
