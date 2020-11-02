@@ -25,6 +25,7 @@ class sqlQueries(config):
         super().__init__()
         self.date = None #for inputting
         self.dateDotNotation = None #for scraping
+        self.set = None
         self.selectedDate = None
         self.fullDate = None
 
@@ -72,16 +73,29 @@ class sqlQueries(config):
         self.mydb.commit()
         cursor.close()
 
-    def chooseDay(self, manual='no'):
+    def findDays(self):
+        if self.set['days']>=0:
+            self.set['start'] = get_past_date(f'{self.set["days"]} days ago', self.set['end'])
+            return self.set
+
+        if self.set['start']!='empty' and self.set["end"]!='empty':
+            start = datetime.date(self.set['start']['year'], self.set['start']['month'], self.set['start']['day']).strftime('%j')
+            end = datetime.date(self.set['end']['year'], self.set['end']['month'], self.set['end']['day']).strftime('%j')
+            self.set['days'] = int(end) - int(start)
+            self.set['start'] = get_past_date(f'{self.set["days"]} days ago', self.set['end'])
+            return self.set
+
+        if self.set['start']!='empty' and self.set["end"]=='empty':
+            self.set['start'] = datetime.date(self.set['start']['year'], self.set['start']['month'], self.set['start']['day'])
+            return self.set
+
+        return self.set
+
+    def chooseDay(self, manual="empty"):
         hour = int(datetime.datetime.now().strftime('%H'))
 
-        if manual!='no':
-            for key, value in manual.items():
-                if isinstance(value,int)==False:
-                    self.driver.quit()
-                    sys.exit('Date argument should be in numbers not string')
-                    exit()
-            self.selectedDate=datetime.date(manual['year'], manual['month'], manual['day'])
+        if manual!="empty":
+            self.selectedDate = manual
 
         elif hour >= 23: #the half of the day
             self.selectedDate = get_past_date('today')
@@ -514,13 +528,17 @@ def switchHandle(currentDriver): #to popup
     print('Switched. \n')
     return main_page
 
-def get_past_date(str_days_ago):
-    TODAY = datetime.date.today()
+def get_past_date(str_days_ago,end='empty'):
+    if end!='empty': TODAY = datetime.date(end['year'], end['month'], end['day'])
+    else: TODAY = datetime.date.today()
     splitted = str_days_ago.split()
     if len(splitted) == 1 and splitted[0].lower() == 'today':
         return TODAY
     elif len(splitted) == 1 and splitted[0].lower() == 'yesterday':
         date = TODAY - relativedelta(days=1)
+        return date
+    elif splitted[1].lower() in ['day', 'days', 'd']:
+        date = TODAY - relativedelta(days=int(splitted[0]))
         return date
     else:
         return "Wrong Argument format"
@@ -534,12 +552,8 @@ def startingTimer():
 def ExceptionHandler(type, value, tb):
     logger.exception("Error: {0}".format(str(value)))
 
-
-if __name__=="__main__":
-
-    queries = sqlQueries()
-    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
-
+def setLogger():
+    global print, logger
     #logger
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     logger = logging.getLogger()
@@ -549,12 +563,34 @@ if __name__=="__main__":
             os.mkdir(queries.getDirectory() + fr'\Logs')
     logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
     print = logger.info
-    sys.excepthook = ExceptionHandler
 
-    print(f'\n[{queries.date}]')
+def runProductMixUnfinished():
+    root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
+    startingTimer()
+    queries = sqlQueries()
+    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
 
+    try:
+        queries.dateTBL()
+    except queries.MySQLdb._exceptions.IntegrityError:
+        print('Date exists, deleting quarters associated with it... (not really)')
+        #queries.deleteDayForQuarter()
+        print('Done \n')
+    task=ConsumptionTables(root)
+    task.login()
+    task.clickTaskOption("Node_1018704_0")
+    task.selectOrgType()
+    task.clickPCOptions('__lufBusUnit_image')
+    pcNumbers = task.handlePCNumbers()
+    queries.storeTBL(pcNumbers)
+    print(f'{pcNumbers[0]} is the first PC')
+    task.inputPCNumber(pcNumbers[0],"lookupSite")
+    task.inputDate(queries.date,'lkupDates_image')
+    task.click('wrqtr_hour_sales_activity__AutoRunReport')
+    time.sleep(5)
+    task.driver.quit()
 
-    print('\nQuarterly Hour Reports')
+def runQuarterlyHour():
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
     try:
@@ -585,48 +621,23 @@ if __name__=="__main__":
         queries.quarterlyHourTBL(pcNumber,task.columns)
     task.driver.quit()
 
-
-
-
-    """
-    print('\nProduct Mix Reports')
+def runDigital(queries):
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
-    queries = sqlQueries()
-    queries.chooseDay() #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
-
-    try:
-        queries.dateTBL()
-    except queries.MySQLdb._exceptions.IntegrityError:
-        print('Date exists, deleting quarters associated with it... (not really)')
-        #queries.deleteDayForQuarter()
-        print('Done \n')
-    task=ConsumptionTables(root)
+    task = DDailySummary(root)
     task.login()
-    task.clickTaskOption("Node_1018704_0")
-    task.selectOrgType()
-    task.clickPCOptions('__lufBusUnit_image')
-    pcNumbers = task.handlePCNumbers()
-    queries.storeTBL(pcNumbers)
-    print(f'{pcNumbers[0]} is the first PC')
-    task.inputPCNumber(pcNumbers[0],"lookupSite")
-    task.inputDate(queries.date,'lkupDates_image')
-    task.click('wrqtr_hour_sales_activity__AutoRunReport')
-    time.sleep(5)
-    task.driver.quit()
-    """
 
-    print('\nDunkin Daily Summary')
-    root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
-    startingTimer()
+    queries.chooseDay(queries.set['start']) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+    setLogger()
+    sys.excepthook = ExceptionHandler
+    print(f'\n[{queries.date}]')
     try:
         queries.dateTBL()
     except queries.MySQLdb._exceptions.IntegrityError:
         print('Date exists, deleting digital data associated with it...')
         queries.deleteDayForDigital()
         print('Done \n')
-    task = DDailySummary(root);
-    task.login()
+
     task.clickTaskOption("Node_1018698_0")
     task.clickPCOptions('__lufBusUnit_image')
     pcNumbers = task.handlePCNumbers()
@@ -641,11 +652,36 @@ if __name__=="__main__":
     for pcNumber in pcNumbers:
         task.click("wrDailySummary__Options")
         task.inputPCNumber(pcNumber,"__lufBusUnit")
-        task.inputDate(queries.date,'wlfTimePeriod_image')
         task.click('wrDailySummary__AutoRunReport')
+        time.sleep(2)
         task.scrape(task.driver.page_source)
         queries.digitalTBL(pcNumber,task.columns)
-
-
     time.sleep(2)
     task.driver.quit()
+
+if __name__=="__main__":
+
+    queries = sqlQueries()
+    starting = {'year':2020, 'month':1, 'day':1}
+    ending = {'year':2020, 'month':1, 'day':2}
+    queries.set = {"start":starting, "end":ending, "days":-1}
+    queries.set = queries.findDays()
+
+    while queries.set['days']>=0:
+        print(f'{queries.set["days"]} days')
+        queries.set = queries.findDays()
+        """
+        print('\nQuarterly Hour Reports')
+        runQuarterlyHour()
+        """
+        """
+        print('\nProduct Mix Reports')
+        runProductMixUnfinished()
+        """
+        print('\nDunkin Daily Summary')
+        runDigital(queries)
+        if queries.set['days']-1==-1: exit()
+        queries.set['days']-=1
+
+
+    runDigital(queries)
