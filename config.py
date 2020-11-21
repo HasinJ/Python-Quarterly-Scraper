@@ -11,6 +11,10 @@ class config():
         self.__RDSPass = StringVar()
         self.__RDSDb = StringVar()
 
+        self.__sender_email = StringVar() # Enter your address
+        self.__receiver_email = StringVar()  # Enter receiver address
+        self.__password = StringVar()
+
         self.MySQLdb = MySQLdb
         self.mydb = self.MySQLdb.connect(host = self.__RDSHost,
             user = self.__RDSUser,
@@ -25,3 +29,19 @@ class config():
 
     def getRadPass(self):
         return self.__radPass
+
+    def sendEmail(self, queries):
+        import smtplib, ssl
+
+        port = 465  # For SSL
+        smtp_server = "smtp.gmail.com"
+        message = f"""\
+        Subject: Error in Application
+
+        Automation application has thrown an error for today. Please check logs for {queries.date}.\n
+        DO NOT REPLY."""
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
+            server.login(self.__sender_email, self.__password)
+            server.sendmail(self.__sender_email, self.__receiver_email, message)

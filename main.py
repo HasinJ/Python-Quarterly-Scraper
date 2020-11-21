@@ -550,7 +550,9 @@ def startingTimer():
         time.sleep(1)
 
 def ExceptionHandler(type, value, tb):
+    logger.exception("Type: {0}".format(str(type)))
     logger.exception("Error: {0}".format(str(value)))
+    queries.sendEmail(queries)
 
 def setLogger():
     global print, logger
@@ -660,7 +662,7 @@ def runDigital(queries):
     task.driver.quit()
 
 if __name__=="__main__":
-
+    global queries
     queries = sqlQueries()
     starting = {'year':2020, 'month':1, 'day':1}
     ending = {'year':2020, 'month':1, 'day':2}
@@ -672,7 +674,7 @@ if __name__=="__main__":
         queries.set = queries.findDays()
         """
         print('\nQuarterly Hour Reports')
-        runQuarterlyHour()
+        runQuarterlyHour(queries)
         """
         """
         print('\nProduct Mix Reports')
