@@ -592,9 +592,16 @@ def runProductMixUnfinished():
     time.sleep(5)
     task.driver.quit()
 
-def runQuarterlyHour():
+def runQuarterlyHour(queries):
     root = webdriver.Ie(r"C:\Program Files (x86)\IEDriver\IEDriverServer.exe")
     startingTimer()
+    task = QuarterlyHour(root)
+    task.login()
+
+    queries.chooseDay(queries.set['start'])
+    setLogger()
+    sys.excepthook = ExceptionHandler
+    print(f'\n[{queries.date}]')
     try:
         queries.dateTBL()
     except queries.MySQLdb._exceptions.IntegrityError:
@@ -602,8 +609,6 @@ def runQuarterlyHour():
         queries.deleteDayForQuarter()
         print('Done \n')
 
-    task = QuarterlyHour(root)
-    task.login()
     task.clickTaskOption("Node_1018702_0")
     task.clickPCOptions('lookupSite_image')
     pcNumbers = task.handlePCNumbers()
@@ -629,7 +634,7 @@ def runDigital(queries):
     task = DDailySummary(root)
     task.login()
 
-    queries.chooseDay(queries.set['start']) #can also be used for one day format: dateTBL({'year':2020, 'month':2, 'day':2}) day and month shouldnt have zero
+    queries.chooseDay(queries.set['start'])
     setLogger()
     sys.excepthook = ExceptionHandler
     print(f'\n[{queries.date}]')
