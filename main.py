@@ -669,26 +669,33 @@ def runDigital(queries):
 if __name__=="__main__":
     global queries
     queries = sqlQueries()
-    starting = {'year':2020, 'month':1, 'day':1}
-    ending = {'year':2020, 'month':1, 'day':2}
+    starting = 'empty' #{'year':2019, 'month':1, 'day':1} to select starting date
+    ending = 'empty' #{'year':2019, 'month':1, 'day':1} to select ending date
     queries.set = {"start":starting, "end":ending, "days":-1}
     queries.set = queries.findDays()
 
     while queries.set['days']>=0:
         print(f'{queries.set["days"]} days')
         queries.set = queries.findDays()
-        """
+
+
         print('\nQuarterly Hour Reports')
         runQuarterlyHour(queries)
-        """
+
+
         """
         print('\nProduct Mix Reports')
         runProductMixUnfinished()
         """
+
+
         print('\nDunkin Daily Summary')
         runDigital(queries)
+
+
         if queries.set['days']-1==-1: exit()
         queries.set['days']-=1
 
-
+    runQuarterlyHour(queries)
+    """runProductMixUnfinished()"""
     runDigital(queries)
