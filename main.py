@@ -211,6 +211,7 @@ class sqlQueries(config):
         for row in csv_data:
            cursor.execute(sql, row)
         self.mydb.commit()
+        print("Data committed to database.")
         cursor.close()
 
 class Radiant(config):
@@ -484,6 +485,7 @@ class scrapeDDailySummary(DDailySummary):
             self.data.append(cell)
             self.dump(pcNumber)
         self.columns = ['PCNumber','Date'] + self.columns
+        print("scrapped...\n")
 
     def dump(self,pcNumber):
         import json
@@ -507,6 +509,7 @@ class scrapeDDailySummary(DDailySummary):
             json.dump(self.data,f)
         df = pd.read_json(open(directory + 'Output.json','r'))
         df.to_csv(directory + 'dataframe.csv', index=False, header=True)
+        print("dumped...")
 
 
 #polymorphism
