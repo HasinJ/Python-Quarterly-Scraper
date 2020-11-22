@@ -38,7 +38,8 @@ class config():
         message = f"""\
         Subject: Error in Application
 
-        Automation application has thrown an error for today. Please check logs for {queries.date}.\n
+        Automation application has thrown an error. Please check logs for {queries.date}.
+
         DO NOT REPLY."""
 
         context = ssl.create_default_context()
