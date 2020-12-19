@@ -14,6 +14,7 @@ import pandas as pd
 import math
 import os
 import logging
+import traceback
 import sys
 from config import config
 from bs4 import BeautifulSoup
@@ -213,6 +214,9 @@ class sqlQueries(config):
         self.mydb.commit()
         print("Data committed to database.")
         cursor.close()
+
+    def productMixTBLs(self,pcNumber,columns):
+        pass
 
 class Radiant(config):
     def __init__(self, driver):
@@ -440,6 +444,20 @@ class scrapeQuarterlyHour(QuarterlyHour):
         df = pd.read_json(open(directory + 'Output.json','r'))
         df.to_csv(directory + 'dataframe.csv', index=False, header=True)
 
+class scrapeConsumptionTables(ConsumptionTables):
+    def __init__(self,driver,date,oddCount,evenCount):
+        super().__init__(driver)
+        self.__date = date
+        self.oddCount=oddCount
+        self.evenCount=evenCount
+        self.data=[]
+        self.columns=[]
+
+    def scrape(self,html):
+        pass
+
+    def dump(self,pcNumber):
+        pass
 
 class scrapeDDailySummary(DDailySummary):
     def __init__(self,driver,date,oddCount,evenCount):
@@ -555,6 +573,10 @@ def startingTimer():
 def ExceptionHandler(type, value, tb):
     logger.exception("Type: {0}".format(str(type)))
     logger.exception("Error: {0}".format(str(value)))
+    traceback_str = traceback.format_tb(tb)
+    print("traceback:\n")
+    for string in traceback_str:
+        print(string)
     queries.sendEmail(queries)
 
 def setLogger():
@@ -564,9 +586,7 @@ def setLogger():
     logger = logging.getLogger()
     if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
             os.mkdir(queries.getDirectory() + fr'\Logs')
-    if os.path.isdir(queries.getDirectory() + fr'\Logs')==False:
-            os.mkdir(queries.getDirectory() + fr'\Logs')
-    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'a'))
+    logger.addHandler(logging.FileHandler(queries.getDirectory()+fr'\Logs\{queries.dateDotNotation}.txt', 'w'))
     print = logger.info
 
 def runProductMixUnfinished():
@@ -589,9 +609,11 @@ def runProductMixUnfinished():
     pcNumbers = task.handlePCNumbers()
     queries.storeTBL(pcNumbers)
     print(f'{pcNumbers[0]} is the first PC')
-    task.inputPCNumber(pcNumbers[0],"lookupSite")
+    task.inputPCNumber(pcNumbers[0],"__lufBusUnit")
     task.inputDate(queries.date,'lkupDates_image')
-    task.click('wrqtr_hour_sales_activity__AutoRunReport')
+    task.click('wrLHSalesMixCon__AutoRunReport')
+    task = scrapeConsumptionTables(task.driver,queries.date,task.oddCount,task.evenCount)
+    task.scrape(task.driver.page_source)
     time.sleep(5)
     task.driver.quit()
 
