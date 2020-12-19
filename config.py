@@ -7,6 +7,7 @@ class config():
         self.__directory = StringVar()
 
         self.__RDSHost = StringVar()
+        self.__PORT = 0
         self.__RDSUser = StringVar()
         self.__RDSPass = StringVar()
         self.__RDSDb = StringVar()
@@ -17,6 +18,7 @@ class config():
 
         self.MySQLdb = MySQLdb
         self.mydb = self.MySQLdb.connect(host = self.__RDSHost,
+            port=self.__PORT,
             user = self.__RDSUser,
             passwd = self.__RDSPass,
             db = self.__RDSDb)
